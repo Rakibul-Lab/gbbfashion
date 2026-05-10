@@ -2,7 +2,7 @@
 
 import { useStore } from '@/lib/store'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Play, Pause, ShoppingBag, Volume2, VolumeX, X } from 'lucide-react'
+import { Play, ShoppingBag, Volume2, VolumeX, X } from 'lucide-react'
 import { useState, useRef, useEffect, useCallback } from 'react'
 
 interface ReelProduct {
@@ -65,19 +65,48 @@ const reelProducts: ReelProduct[] = [
 
 function ReelCard({ product, index }: { product: ReelProduct; index: number }) {
   const { addToCart, selectProduct, setView } = useStore()
-  const [isPlaying, setIsPlaying] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(true)
   const [isMuted, setIsMuted] = useState(true)
   const [showOverlay, setShowOverlay] = useState(false)
+  const [isInViewport, setIsInViewport] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  // IntersectionObserver: auto-play when visible, pause when off-screen
+  useEffect(() => {
+    const card = cardRef.current
+    if (!card) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInViewport(entry.isIntersecting)
+      },
+      { threshold: 0.3 }
+    )
+    observer.observe(card)
+    return () => observer.disconnect()
+  }, [])
+
+  // Play/pause based on viewport visibility
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    if (isInViewport && isPlaying) {
+      video.play().catch(() => {
+        // Autoplay blocked by browser, keep muted
+      })
+    } else {
+      video.pause()
+    }
+  }, [isInViewport, isPlaying])
 
   const togglePlay = useCallback(() => {
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause()
       } else {
-        videoRef.current.play().catch(() => {
-          // Video play failed, just show thumbnail
-        })
+        videoRef.current.play().catch(() => {})
       }
       setIsPlaying(!isPlaying)
     }
@@ -126,21 +155,23 @@ function ReelCard({ product, index }: { product: ReelProduct; index: number }) {
     >
       {/* Video / Thumbnail Card */}
       <div
+        ref={cardRef}
         className="relative aspect-[9/16] overflow-hidden rounded-lg bg-slate-900 cursor-pointer"
         onClick={togglePlay}
       >
-        {/* Video element */}
+        {/* Video element — autoplay, muted, looping */}
         <video
           ref={videoRef}
           src={product.videoSrc}
           poster={product.videoThumbnail}
           muted={isMuted}
           loop
+          autoPlay
           playsInline
           className="w-full h-full object-cover"
         />
 
-        {/* Thumbnail fallback (shown when video isn't playing) */}
+        {/* Thumbnail fallback (shown when video is paused) */}
         {!isPlaying && (
           <img
             src={product.videoThumbnail}
@@ -169,7 +200,7 @@ function ReelCard({ product, index }: { product: ReelProduct; index: number }) {
           </button>
         </div>
 
-        {/* Play/Pause center button */}
+        {/* Play button when paused */}
         {!isPlaying && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-12 h-12 rounded-full bg-white/25 backdrop-blur-md flex items-center justify-center border border-white/30">
@@ -177,28 +208,6 @@ function ReelCard({ product, index }: { product: ReelProduct; index: number }) {
             </div>
           </div>
         )}
-
-        {/* Pause indicator */}
-        <AnimatePresence>
-          {isPlaying && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              onClick={togglePlay}
-            >
-              <motion.div
-                initial={{ scale: 1, opacity: 0.8 }}
-                animate={{ scale: 1.5, opacity: 0 }}
-                transition={{ duration: 0.5 }}
-                className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center"
-              >
-                <Pause className="w-5 h-5 text-white fill-white" />
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Bottom info overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 pointer-events-none">
@@ -271,17 +280,18 @@ function ReelCard({ product, index }: { product: ReelProduct; index: number }) {
           )}
         </AnimatePresence>
 
-        {/* Video progress bar */}
-        {isPlaying && (
-          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20 pointer-events-none">
+        {/* Video progress bar — always visible when playing */}
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10 pointer-events-none">
+          {isPlaying && (
             <motion.div
-              className="h-full bg-white"
+              key={`progress-${product.id}`}
+              className="h-full bg-white/80"
               initial={{ width: '0%' }}
               animate={{ width: '100%' }}
-              transition={{ duration: 15, repeat: Infinity, ease: 'linear' }}
+              transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
             />
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </motion.div>
   )
