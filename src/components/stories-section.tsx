@@ -2,7 +2,7 @@
 
 import { useStore } from '@/lib/store'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShoppingBag, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ShoppingBag, X, ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react'
 import { useState, useRef, useEffect, useCallback } from 'react'
 
 interface ReelProduct {
@@ -243,18 +243,27 @@ function ReelModal({
   onClose: () => void
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
+  const [isMuted, setIsMuted] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const { addToCart } = useStore()
 
   const product = products[currentIndex]
 
-  // Autoplay video when modal opens or index changes
+  // Autoplay video with sound when modal opens or index changes
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
+    video.muted = isMuted
     video.currentTime = 0
     video.play().catch(() => {})
   }, [currentIndex])
+
+  // Sync mute state to video
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    video.muted = isMuted
+  }, [isMuted])
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -330,12 +339,12 @@ function ReelModal({
         className="relative w-[320px] sm:w-[380px] md:w-[420px] max-h-[85vh] aspect-[9/16] rounded-xl overflow-hidden bg-slate-900"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Video */}
+        {/* Video — unmuted with sound by default in modal */}
         <video
           ref={videoRef}
           src={product.videoSrc}
           poster={product.videoThumbnail}
-          muted
+          muted={isMuted}
           loop
           autoPlay
           playsInline
@@ -344,6 +353,14 @@ function ReelModal({
 
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
+
+        {/* Sound on/off toggle */}
+        <button
+          onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted) }}
+          className="absolute top-12 right-4 z-20 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 flex items-center justify-center transition-colors"
+        >
+          {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+        </button>
 
         {/* Indicator dots */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-1.5 pointer-events-none">
