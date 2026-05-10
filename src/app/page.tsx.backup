@@ -1,0 +1,124 @@
+'use client'
+
+import { useEffect } from 'react'
+import { useStore } from '@/lib/store'
+import { Header } from '@/components/header'
+import { Footer } from '@/components/footer'
+import { AuthGuard } from '@/components/auth-guard'
+import dynamic from 'next/dynamic'
+
+// Use dynamic imports with no SSR to reduce initial compilation overhead
+const HeroSection = dynamic(() => import('@/components/hero-section').then(m => ({ default: m.HeroSection })), { ssr: false })
+const FeaturedCollections = dynamic(() => import('@/components/featured-collections').then(m => ({ default: m.FeaturedCollections })), { ssr: false })
+const PromoBanners = dynamic(() => import('@/components/promo-banners').then(m => ({ default: m.PromoBanners })), { ssr: false })
+const NewInTrend = dynamic(() => import('@/components/new-in-trend').then(m => ({ default: m.NewInTrend })), { ssr: false })
+const StoriesSection = dynamic(() => import('@/components/stories-section').then(m => ({ default: m.StoriesSection })), { ssr: false })
+const BackpackSeries = dynamic(() => import('@/components/backpack-series').then(m => ({ default: m.BackpackSeries })), { ssr: false })
+const BagTheVibe = dynamic(() => import('@/components/bag-the-vibe').then(m => ({ default: m.BagTheVibe })), { ssr: false })
+const LuxeLeatherBags = dynamic(() => import('@/components/luxe-leather-bags').then(m => ({ default: m.LuxeLeatherBags })), { ssr: false })
+const ToteBackpack = dynamic(() => import('@/components/tote-backpack').then(m => ({ default: m.ToteBackpack })), { ssr: false })
+const OwnItLeadIt = dynamic(() => import('@/components/own-it-lead-it').then(m => ({ default: m.OwnItLeadIt })), { ssr: false })
+const TrustBar = dynamic(() => import('@/components/trust-bar').then(m => ({ default: m.TrustBar })), { ssr: false })
+const ProductGrid = dynamic(() => import('@/components/product-grid').then(m => ({ default: m.ProductGrid })), { ssr: false })
+const ProductDetail = dynamic(() => import('@/components/product-detail').then(m => ({ default: m.ProductDetail })), { ssr: false })
+const CartView = dynamic(() => import('@/components/cart-view').then(m => ({ default: m.CartView })), { ssr: false })
+const CheckoutView = dynamic(() => import('@/components/checkout-view').then(m => ({ default: m.CheckoutView })), { ssr: false })
+const OrderConfirmation = dynamic(() => import('@/components/order-confirmation').then(m => ({ default: m.OrderConfirmation })), { ssr: false })
+const AdminDashboard = dynamic(() => import('@/components/admin-dashboard').then(m => ({ default: m.AdminDashboard })), { ssr: false })
+const LoginForm = dynamic(() => import('@/components/auth/login-form').then(m => ({ default: m.LoginForm })), { ssr: false })
+const SignupForm = dynamic(() => import('@/components/auth/signup-form').then(m => ({ default: m.SignupForm })), { ssr: false })
+
+function LoadingSpinner() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-800" />
+    </div>
+  )
+}
+
+function SectionLoader() {
+  return (
+    <div className="h-48 flex items-center justify-center">
+      <div className="h-6 w-6 animate-spin rounded-full border-3 border-slate-200 border-t-amber-600" />
+    </div>
+  )
+}
+
+function ViewRenderer({ view }: { view: string }) {
+  const { user, setView } = useStore()
+
+  // Protect admin view: require authentication and admin role
+  if (view === 'admin') {
+    if (!user) {
+      setView('login')
+      return null
+    }
+    if (user.role !== 'admin') {
+      setView('home')
+      return null
+    }
+  }
+
+  switch (view) {
+    case 'home':
+      return (
+        <>
+          <HeroSection />
+          <FeaturedCollections />
+          <PromoBanners />
+          <NewInTrend />
+          <StoriesSection />
+          <BackpackSeries />
+          <BagTheVibe />
+          <LuxeLeatherBags />
+          <ToteBackpack />
+          <OwnItLeadIt />
+          <TrustBar />
+        </>
+      )
+    case 'shop':
+      return <ProductGrid />
+    case 'product':
+      return <ProductDetail />
+    case 'cart':
+      return <CartView />
+    case 'checkout':
+      return <CheckoutView />
+    case 'confirmation':
+      return <OrderConfirmation />
+    case 'admin':
+      return <AdminDashboard />
+    case 'login':
+      return <LoginForm />
+    case 'signup':
+      return <SignupForm />
+    default:
+      return null
+  }
+}
+
+export default function Home() {
+  const view = useStore((s) => s.view)
+
+  // Seed database on first load
+  useEffect(() => {
+    fetch('/api/seed', { method: 'POST' })
+      .then((res) => res.json())
+      .then((data) => {
+        console.log('Seed result:', data.message)
+      })
+      .catch(console.error)
+  }, [])
+
+  return (
+    <div className="min-h-screen flex flex-col bg-white">
+      <AuthGuard>
+        <Header />
+        <main className="flex-1">
+          <ViewRenderer view={view} />
+        </main>
+        <Footer />
+      </AuthGuard>
+    </div>
+  )
+}
