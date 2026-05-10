@@ -7,7 +7,7 @@ import { Footer } from '@/components/footer'
 import { HeroSection } from '@/components/hero-section'
 import { CategoryCards } from '@/components/category-cards'
 import { PopularProducts } from '@/components/popular-products'
-import { StoriesSection } from '@/components/stories-section'
+import { FeaturedCollections } from '@/components/featured-collections'
 import { TrustBar } from '@/components/trust-bar'
 import { ProductGrid } from '@/components/product-grid'
 import { ProductDetail } from '@/components/product-detail'
@@ -23,9 +23,9 @@ function ViewRenderer({ view }: { view: ViewType }) {
       return (
         <>
           <HeroSection />
+          <FeaturedCollections />
           <CategoryCards />
           <PopularProducts />
-          <StoriesSection />
           <TrustBar />
         </>
       )

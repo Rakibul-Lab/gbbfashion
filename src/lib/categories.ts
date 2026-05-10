@@ -1,44 +1,53 @@
 // Shared constants for categories and sub-categories
-// Fashion e-commerce categories matching gbbfashion.com style
+// Fashion e-commerce categories matching gbbfashion.com / thepatchee.com style
 
 export const subCategoryMap: Record<string, string> = {
+  'Croissant Chic Crossbody Bag': 'cross-body-bag',
+  'Butterfly Design Shoulder Bag': 'shoulder-bag',
+  'New Style Large-Capacity Shoulder Bag': 'shoulder-bag',
+  'Elevated Twill Crossbody Bag': 'cross-body-bag',
+  'Versatile Dumpling Shoulder Bag': 'shoulder-bag',
   'GBB Exclusive Cow Leather Tote Handbag': 'tote-bag',
-  'Elegant Crossbody Bag with Gold Chain': 'cross-body-bag',
-  'Luxury Shoulder Bag - Burgundy': 'shoulder-bag',
-  'Mini Bag - Rose Pink Edition': 'mini-bag',
-  'Premium Leather Hand Bag - Cream': 'hand-bag',
-  'Classic Red Leather Handbag': 'hand-bag',
+  "Men's RFID Smart Pop Up Wallet": 'wallet',
+  'Light Weight Fitness Training Gym Duffle Bag': 'duffle-bag',
+  'The Luxe Large-Capacity Cosmetic Bag': 'cosmetic-bag',
   'Premium Leather Backpack - Dark Brown': 'bag-pack',
-  'Leather Messenger Bag - Cognac': 'bag-pack',
-  'Long Wallet - Black Premium': 'long-wallet',
-  "Kids' Mini Backpack - Pastel": 'kids-bag',
-  'Oxford Dress Shoes - Dark Brown': 'man-shoes',
-  'High Heel Pumps - Nude Beige': 'women-shoes',
+  'Breathable Soft-Sole Fashion Loafers': 'loafers',
+  'Urban Lite Low-Top Casual Sneakers': 'sneakers',
+  "Men's Suede Finish Slip On Open Back Loafers": 'loafers',
+  "Men's Slip-On Moccasin Loafers": 'loafers',
+  "Men's Velocity Sport High Runner Shoes": 'runner-shoes',
+  "Men's Linen Breathable Fisherman Loafers": 'loafers',
+  'Trend Core Urban Style Sneakers': 'sneakers',
+  'Fashionable British Style Loafers': 'loafers',
   'Classic Leather Belt - Black': 'male-belt',
-  'Elegant Women\'s Belt - Tan': 'female-belt',
+  "Elegant Women's Belt - Tan": 'female-belt',
+  "Kids' Mini Backpack - Pastel": 'kids-bag',
   'Leather Key Holder - Brown': 'key-holder',
 }
 
 export const categorySubCategories: Record<string, { value: string; label: string }[]> = {
   women: [
-    { value: 'hand-bag', label: 'Hand Bag' },
     { value: 'cross-body-bag', label: 'Cross Body Bag' },
     { value: 'shoulder-bag', label: 'Shoulder Bag' },
     { value: 'tote-bag', label: 'Tote Bag' },
+    { value: 'hand-bag', label: 'Hand Bag' },
     { value: 'mini-bag', label: 'Mini Bag' },
-    { value: 'bag-pack', label: 'Bag Pack' },
   ],
   men: [
-    { value: 'bag-pack', label: 'Bag Pack Bag' },
-    { value: 'long-wallet', label: 'Money Bag / Long Wallet' },
+    { value: 'bag-pack', label: 'Backpack' },
+    { value: 'duffle-bag', label: 'Duffle Bag' },
+    { value: 'wallet', label: 'Wallet' },
+    { value: 'cosmetic-bag', label: 'Cosmetic Bag' },
   ],
   shoes: [
-    { value: 'man-shoes', label: 'Man Shoes' },
-    { value: 'women-shoes', label: 'Women Shoes' },
+    { value: 'loafers', label: 'Loafers' },
+    { value: 'sneakers', label: 'Sneakers' },
+    { value: 'runner-shoes', label: 'Runner Shoes' },
   ],
   belt: [
-    { value: 'male-belt', label: 'Male' },
-    { value: 'female-belt', label: 'Female' },
+    { value: 'male-belt', label: 'Men' },
+    { value: 'female-belt', label: 'Women' },
   ],
   kids: [
     { value: 'kids-bag', label: 'Kids Bags' },

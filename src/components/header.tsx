@@ -32,36 +32,38 @@ const navCategories = [
     value: 'women',
     label: 'WOMEN',
     subcategories: [
-      { value: 'hand-bag', label: 'Hand Bag' },
       { value: 'cross-body-bag', label: 'Cross Body Bag' },
       { value: 'shoulder-bag', label: 'Shoulder Bag' },
       { value: 'tote-bag', label: 'Tote Bag' },
+      { value: 'hand-bag', label: 'Hand Bag' },
       { value: 'mini-bag', label: 'Mini Bag' },
-      { value: 'bag-pack', label: 'Bag Pack' },
     ],
   },
   {
     value: 'men',
     label: 'MEN',
     subcategories: [
-      { value: 'bag-pack', label: 'Bag Pack Bag' },
-      { value: 'long-wallet', label: 'Money Bag / Long Wallet' },
+      { value: 'bag-pack', label: 'Backpack' },
+      { value: 'duffle-bag', label: 'Duffle Bag' },
+      { value: 'wallet', label: 'Wallet' },
+      { value: 'cosmetic-bag', label: 'Cosmetic Bag' },
     ],
   },
   {
     value: 'shoes',
     label: 'SHOES',
     subcategories: [
-      { value: 'man-shoes', label: 'Man Shoes' },
-      { value: 'women-shoes', label: 'Women Shoes' },
+      { value: 'loafers', label: 'Loafers' },
+      { value: 'sneakers', label: 'Sneakers' },
+      { value: 'runner-shoes', label: 'Runner Shoes' },
     ],
   },
   {
     value: 'belt',
     label: 'BELT',
     subcategories: [
-      { value: 'male-belt', label: 'Male' },
-      { value: 'female-belt', label: 'Female' },
+      { value: 'male-belt', label: 'Men' },
+      { value: 'female-belt', label: 'Women' },
     ],
   },
   {
