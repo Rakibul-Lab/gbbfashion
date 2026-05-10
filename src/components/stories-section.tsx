@@ -1,138 +1,120 @@
 'use client'
 
 import { useStore } from '@/lib/store'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { motion } from 'framer-motion'
-import { ShoppingCart } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { ArrowRight } from 'lucide-react'
 
-interface Product {
-  id: string
-  name: string
-  price: number
-  image: string
-  rating: number
-  badge: string | null
-  category: string
-}
-
-const badgeColors: Record<string, string> = {
-  'Best Seller': 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  'New': 'bg-teal-100 text-teal-700 border-teal-200',
-  'Premium': 'bg-amber-100 text-amber-700 border-amber-200',
-  'Popular': 'bg-rose-100 text-rose-700 border-rose-200',
-}
-
-const featuredProductNames = [
-  'GBB Exclusive Cow Leather Tote Handbag',
-  'Premium Leather Backpack - Dark Brown',
-  'Elegant Crossbody Bag with Gold Chain',
-  'Oxford Dress Shoes - Dark Brown',
-  'Luxury Shoulder Bag - Burgundy',
+const stories = [
+  {
+    id: 'story-women',
+    image: '/story-model-1.png',
+    tagline: 'Timeless. Bold. Unstoppable.',
+    subtext: 'Discover the collection that defines her confidence',
+    categoryFilter: 'women',
+    label: 'Women',
+  },
+  {
+    id: 'story-men',
+    image: '/story-model-2.png',
+    tagline: 'Crafted for the Modern Man',
+    subtext: 'Where craftsmanship meets contemporary style',
+    categoryFilter: 'men',
+    label: 'Men',
+  },
 ]
 
 export function StoriesSection() {
-  const { setView, selectProduct, addToCart } = useStore()
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+  const { setView, setCategoryFilter } = useStore()
 
-  useEffect(() => {
-    fetch('/api/products')
-      .then((res) => res.json())
-      .then((data) => {
-        const featured = featuredProductNames
-          .map((name) => data.find((p: Product) => p.name === name))
-          .filter(Boolean) as Product[]
-        setProducts(featured)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [])
-
-  if (loading) {
-    return (
-      <section className="py-12 sm:py-16 bg-slate-50">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin h-6 w-6 border-2 border-amber-200 border-t-amber-600 rounded-full" />
-          </div>
-        </div>
-      </section>
-    )
+  const handleClick = (categoryFilter: string) => {
+    setCategoryFilter(categoryFilter)
+    setView('shop')
   }
 
   return (
-    <section className="py-12 sm:py-16 bg-slate-50">
+    <section className="py-12 sm:py-16 lg:py-20 bg-stone-50">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="mb-8">
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900" style={{ fontFamily: 'Jost, sans-serif' }}>Featured Picks</h2>
-          <p className="mt-2 text-slate-500 text-sm">Handpicked selections from our latest collection.</p>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-8 sm:mb-12"
+        >
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-widest text-slate-900">
+            STORIES THAT LEAD
+          </h2>
+          <div className="mt-4 mx-auto w-16 h-0.5 bg-amber-500" />
+          <p className="mt-4 text-slate-500 text-sm sm:text-base max-w-lg mx-auto tracking-wide">
+            More than fashion — a statement of identity. Discover the narratives behind our collections.
+          </p>
+        </motion.div>
 
-        {/* Stories Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-          {products.map((product, index) => (
+        {/* Story Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6 lg:gap-8">
+          {stories.map((story, index) => (
             <motion.div
-              key={product.id}
-              initial={{ opacity: 0, y: 20 }}
+              key={story.id}
+              initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.08, duration: 0.4 }}
-              className="group"
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{
+                delay: index * 0.15,
+                duration: 0.7,
+                ease: [0.25, 0.46, 0.45, 0.94],
+              }}
+              className="group cursor-pointer"
+              onClick={() => handleClick(story.categoryFilter)}
             >
-              <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-300">
-                <div
-                  className="relative aspect-[3/4] overflow-hidden bg-slate-100 cursor-pointer"
-                  onClick={() => {
-                    selectProduct(product.id)
-                    setView('product')
-                  }}
-                >
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  {product.badge && (
-                    <Badge
-                      className={`absolute top-2.5 left-2.5 text-[10px] ${badgeColors[product.badge] || 'bg-slate-100 text-slate-700'}`}
-                    >
-                      {product.badge}
-                    </Badge>
-                  )}
+              <div className="relative aspect-[3/4] sm:aspect-[3/4] overflow-hidden bg-slate-200 rounded-sm">
+                {/* Image */}
+                <img
+                  src={story.image}
+                  alt={story.tagline}
+                  className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+
+                {/* Gradient overlay for text readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+
+                {/* Content overlay at bottom */}
+                <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6 lg:p-8">
+                  {/* Category label */}
+                  <motion.span
+                    className="inline-block text-[10px] sm:text-xs font-semibold tracking-[0.25em] uppercase text-amber-300 mb-2 sm:mb-3"
+                    initial={{ opacity: 0, y: 10 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.3 + index * 0.15, duration: 0.5 }}
+                  >
+                    {story.label}
+                  </motion.span>
+
+                  {/* Tagline */}
+                  <h3 className="text-white text-xl sm:text-2xl lg:text-3xl font-bold tracking-wide leading-tight mb-1.5 sm:mb-2 transition-transform duration-500 group-hover:-translate-y-2">
+                    {story.tagline}
+                  </h3>
+
+                  {/* Subtext */}
+                  <p className="text-white/60 text-xs sm:text-sm tracking-wide mb-3 sm:mb-4 transition-all duration-500 group-hover:translate-y-0 translate-y-2 group-hover:opacity-100 opacity-0">
+                    {story.subtext}
+                  </p>
+
+                  {/* CTA */}
+                  <div className="flex items-center gap-2 text-white/80 group-hover:text-white transition-all duration-500 group-hover:translate-y-0 translate-y-4 opacity-0 group-hover:opacity-100">
+                    <span className="text-xs sm:text-sm font-semibold tracking-widest uppercase">
+                      Shop Now
+                    </span>
+                    <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+                  </div>
                 </div>
 
-                <div className="p-3">
-                  <h3
-                    className="font-medium text-xs sm:text-sm text-slate-900 line-clamp-1 cursor-pointer hover:text-amber-700 transition-colors"
-                    onClick={() => {
-                      selectProduct(product.id)
-                      setView('product')
-                    }}
-                  >
-                    {product.name}
-                  </h3>
-                  <p className="text-sm font-bold text-amber-700 mt-1">
-                    ${product.price.toLocaleString()}
-                  </p>
-                  <Button
-                    size="sm"
-                    onClick={() =>
-                      addToCart({
-                        productId: product.id,
-                        name: product.name,
-                        price: product.price,
-                        image: product.image,
-                      })
-                    }
-                    className="w-full mt-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg h-8 text-xs"
-                  >
-                    <ShoppingCart className="h-3.5 w-3.5 mr-1" />
-                    Add to Cart
-                  </Button>
-                </div>
+                {/* Hover border accent */}
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-amber-400/40 transition-colors duration-500 rounded-sm" />
+
+                {/* Bottom accent line */}
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-400 scale-x-0 group-hover:scale-x-100 transition-transform duration-600 origin-left" />
               </div>
             </motion.div>
           ))}

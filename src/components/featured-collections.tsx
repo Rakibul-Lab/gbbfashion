@@ -116,7 +116,7 @@ function ProductCard({ product, index }: { product: FeaturedProduct; index: numb
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.05, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="snap-start shrink-0 w-[200px] sm:w-[220px] md:w-[240px] lg:w-[calc((100vw-96px)/5-20px)] min-w-[180px]"
+      className="snap-start shrink-0 w-[220px] sm:w-[240px] md:w-[260px] lg:w-[calc((100vw-96px)/5-16px)] min-w-[200px]"
     >
       <div
         className="group relative"

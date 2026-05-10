@@ -17,7 +17,6 @@ import {
   User,
   Heart,
   X,
-  Settings,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -85,6 +84,12 @@ const navCategories = [
   },
 ]
 
+const announcementMessages = [
+  'FREE SHIPPING ON ORDERS OVER ৳2,000',
+  'CASH ON DELIVERY AVAILABLE',
+  'NEW ARRIVALS JUST DROPPED — SHOP NOW',
+]
+
 export function Header() {
   const { setView, setCategoryFilter, cartCount } = useStore()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -92,14 +97,20 @@ export function Header() {
   const [searchValue, setSearchValue] = useState('')
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
   const [mobileExpanded, setMobileExpanded] = useState<string | null>(null)
+  const [announcementIndex, setAnnouncementIndex] = useState(0)
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const count = cartCount()
 
+  // Rotate announcement messages
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAnnouncementIndex((prev) => (prev + 1) % announcementMessages.length)
+    }, 3500)
+    return () => clearInterval(interval)
+  }, [])
+
   const handleCategoryClick = (value: string) => {
-    if (value === 'new-arrivals') {
-      setCategoryFilter('all')
-      setView('shop')
-    } else if (value === 'prime-drop') {
+    if (value === 'new-arrivals' || value === 'prime-drop') {
       setCategoryFilter('all')
       setView('shop')
     } else {
@@ -149,177 +160,53 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full">
-      {/* Top Bar - Black background matching gbbfashion.com */}
-      <div className="bg-slate-900 text-white text-center py-2 px-4">
-        <p className="text-xs sm:text-sm tracking-wide">
-          New arrivals just dropped — explore the collection.{' '}
-          <button
-            onClick={() => {
-              setCategoryFilter('all')
-              setView('shop')
-            }}
-            className="font-semibold text-amber-400 hover:text-amber-300 transition-colors underline underline-offset-2"
+      {/* Announcement Bar - Black background */}
+      <div className="bg-black text-white text-center py-1.5 px-4 overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={announcementIndex}
+            initial={{ y: 12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -12, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="text-[11px] sm:text-xs tracking-widest font-medium"
           >
-            SHOP NOW
-          </button>
-        </p>
+            {announcementMessages[announcementIndex]}
+          </motion.p>
+        </AnimatePresence>
       </div>
 
-      {/* Main Header - Dark background */}
-      <div className="bg-slate-900">
+      {/* Main Header - Clean white background */}
+      <div className="bg-white border-b border-slate-100">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-14 sm:h-16 items-center justify-between">
-            {/* Logo */}
-            <button
-              onClick={() => setView('home')}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0"
-            >
-              <span className="text-xl sm:text-2xl font-bold tracking-tight" style={{ fontFamily: 'Jost, sans-serif' }}>
-                <span className="text-white">Baand</span>{' '}
-                <span className="text-amber-400">GBB</span>
-              </span>
-            </button>
-
-            {/* Desktop Navigation */}
-            <nav className="hidden lg:flex items-center gap-0.5 h-16">
-              {navCategories.map((cat) => (
-                <div
-                  key={cat.value}
-                  className="relative h-full flex items-center"
-                  onMouseEnter={() => cat.subcategories.length > 0 && handleDropdownEnter(cat.value)}
-                  onMouseLeave={handleDropdownLeave}
-                >
-                  <button
-                    onClick={() => handleCategoryClick(cat.value)}
-                    className={`px-3 py-2 text-[13px] font-medium tracking-wider transition-colors whitespace-nowrap ${
-                      activeDropdown === cat.value
-                        ? 'text-amber-400'
-                        : cat.value === 'prime-drop'
-                        ? 'text-rose-400 hover:text-rose-300'
-                        : 'text-white/80 hover:text-white'
-                    }`}
-                    style={{ fontFamily: 'Jost, sans-serif' }}
-                  >
-                    {cat.label}
-                    {cat.subcategories.length > 0 && (
-                      <ChevronDown className={`h-3 w-3 ml-0.5 inline-block transition-transform ${activeDropdown === cat.value ? 'rotate-180' : ''}`} />
-                    )}
-                  </button>
-
-                  {/* Dropdown */}
-                  <AnimatePresence>
-                    {cat.subcategories.length > 0 && activeDropdown === cat.value && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 4 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute top-full left-0 bg-white border border-slate-100 rounded-lg shadow-xl py-2 min-w-[220px] z-50"
-                      >
-                        {cat.subcategories.map((sub) => (
-                          <button
-                            key={sub.value}
-                            onClick={() => handleSubCategoryClick(cat.value, sub.value)}
-                            className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:text-amber-700 hover:bg-amber-50 transition-colors capitalize"
-                          >
-                            {sub.label}
-                          </button>
-                        ))}
-                        <div className="border-t border-slate-100 my-1" />
-                        <button
-                          onClick={() => handleCategoryClick(cat.value)}
-                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors uppercase tracking-wider"
-                        >
-                          View All {cat.label}
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ))}
-            </nav>
-
-            {/* Right side actions */}
-            <div className="flex items-center gap-1">
-              {/* Search */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSearchOpen(!searchOpen)}
-                className="text-white/70 hover:text-white hover:bg-white/10 h-10 w-10"
-              >
-                <Search className="h-5 w-5" />
-              </Button>
-
-              {/* Wishlist */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden sm:flex text-white/70 hover:text-white hover:bg-white/10 h-10 w-10"
-              >
-                <Heart className="h-5 w-5" />
-              </Button>
-
-              {/* Account */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden sm:flex text-white/70 hover:text-white hover:bg-white/10 h-10 w-10"
-              >
-                <User className="h-5 w-5" />
-              </Button>
-
-              {/* Cart */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setView('cart')}
-                className="relative text-white/70 hover:text-white hover:bg-white/10 h-10 w-10"
-              >
-                <ShoppingCart className="h-5 w-5" />
-                {count > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
-                    {count > 99 ? '99+' : count}
-                  </span>
-                )}
-              </Button>
-
-              {/* Admin */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setView('admin')}
-                className="hidden sm:flex text-white/30 hover:text-white/60 hover:bg-white/10 h-10 w-10"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-
-              {/* Mobile menu */}
+            {/* Mobile menu button (left side on mobile) */}
+            <div className="lg:hidden">
               <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="lg:hidden text-white hover:bg-white/10 h-10 w-10">
+                  <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-700 hover:text-slate-900 hover:bg-slate-50">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-80 p-0">
+                <SheetContent side="left" className="w-80 p-0 bg-white">
                   <div className="flex flex-col h-full">
-                    <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                      <SheetTitle className="text-lg font-bold" style={{ fontFamily: 'Jost, sans-serif' }}>
-                        <span className="text-slate-900">Baand</span>{' '}
-                        <span className="text-amber-600">GBB</span>
+                    {/* Mobile Logo */}
+                    <div className="flex items-center justify-between p-5 border-b border-slate-100">
+                      <SheetTitle className="text-xl">
+                        <span className="font-bold text-slate-900">GBB</span>{' '}
+                        <span className="font-light text-slate-500">Fashion</span>
                       </SheetTitle>
                     </div>
                     <nav className="flex-1 overflow-y-auto py-2">
                       {navCategories.map((cat) => (
                         <div key={cat.value}>
-                          <div className="flex items-center justify-between px-4">
+                          <div className="flex items-center justify-between px-5">
                             <button
-                              className={`flex-1 text-left py-3 text-sm font-semibold tracking-wider transition-colors ${
+                              className={`flex-1 text-left py-3.5 text-[13px] font-semibold tracking-widest transition-colors ${
                                 cat.value === 'prime-drop'
                                   ? 'text-rose-600'
-                                  : 'text-slate-700'
+                                  : 'text-slate-800'
                               }`}
-                              style={{ fontFamily: 'Jost, sans-serif' }}
                               onClick={() => {
                                 handleCategoryClick(cat.value)
                                 setMobileOpen(false)
@@ -330,9 +217,9 @@ export function Header() {
                             {cat.subcategories.length > 0 && (
                               <button
                                 onClick={() => setMobileExpanded(mobileExpanded === cat.value ? null : cat.value)}
-                                className="p-2 text-slate-400 hover:text-slate-600"
+                                className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
                               >
-                                <ChevronDown className={`h-4 w-4 transition-transform ${mobileExpanded === cat.value ? 'rotate-180' : ''}`} />
+                                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${mobileExpanded === cat.value ? 'rotate-180' : ''}`} />
                               </button>
                             )}
                           </div>
@@ -348,7 +235,7 @@ export function Header() {
                                 {cat.subcategories.map((sub) => (
                                   <button
                                     key={sub.value}
-                                    className="w-full text-left pl-8 pr-4 py-2.5 text-sm text-slate-500 hover:text-amber-700 hover:bg-amber-50 transition-colors capitalize"
+                                    className="w-full text-left pl-9 pr-5 py-2.5 text-sm text-slate-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
                                     onClick={() => {
                                       handleSubCategoryClick(cat.value, sub.value)
                                       setMobileOpen(false)
@@ -362,29 +249,146 @@ export function Header() {
                           </AnimatePresence>
                         </div>
                       ))}
-                      <div className="border-t border-slate-100 my-2" />
+                      <div className="border-t border-slate-100 my-3 mx-5" />
                       <button
-                        className="w-full text-left px-4 py-3 text-sm text-slate-500 hover:text-amber-700 transition-colors"
+                        className="w-full text-left px-5 py-3.5 text-[13px] font-medium text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-3"
                         onClick={() => { setView('cart'); setMobileOpen(false) }}
                       >
+                        <ShoppingCart className="h-4 w-4" />
                         Cart ({count})
                       </button>
                       <button
-                        className="w-full text-left px-4 py-3 text-sm text-slate-500 hover:text-amber-700 transition-colors"
+                        className="w-full text-left px-5 py-3.5 text-[13px] font-medium text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-3"
                         onClick={() => { setView('admin'); setMobileOpen(false) }}
                       >
-                        Admin Dashboard
+                        <User className="h-4 w-4" />
+                        Account
                       </button>
                     </nav>
                   </div>
                 </SheetContent>
               </Sheet>
             </div>
+
+            {/* Logo - Center on mobile, left on desktop */}
+            <button
+              onClick={() => setView('home')}
+              className="flex items-center hover:opacity-70 transition-opacity shrink-0"
+            >
+              <span className="text-xl sm:text-2xl">
+                <span className="font-bold text-slate-900">GBB</span>{' '}
+                <span className="font-light text-slate-500">Fashion</span>
+              </span>
+            </button>
+
+            {/* Desktop Navigation - Center */}
+            <nav className="hidden lg:flex items-center gap-0 absolute left-1/2 -translate-x-1/2 h-16">
+              {navCategories.map((cat) => (
+                <div
+                  key={cat.value}
+                  className="relative h-full flex items-center"
+                  onMouseEnter={() => cat.subcategories.length > 0 && handleDropdownEnter(cat.value)}
+                  onMouseLeave={handleDropdownLeave}
+                >
+                  <button
+                    onClick={() => handleCategoryClick(cat.value)}
+                    className={`relative px-3 py-2 text-[12px] font-semibold tracking-widest transition-colors whitespace-nowrap group ${
+                      cat.value === 'prime-drop'
+                        ? 'text-rose-600 hover:text-rose-700'
+                        : 'text-slate-700 hover:text-slate-900'
+                    }`}
+                  >
+                    {cat.label}
+                    {cat.subcategories.length > 0 && (
+                      <ChevronDown className={`h-3 w-3 ml-0.5 inline-block transition-transform duration-200 ${activeDropdown === cat.value ? 'rotate-180' : ''}`} />
+                    )}
+                    {/* Hover underline animation */}
+                    <span className="absolute bottom-1 left-3 right-3 h-[1.5px] bg-slate-900 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+                  </button>
+
+                  {/* Dropdown */}
+                  <AnimatePresence>
+                    {cat.subcategories.length > 0 && activeDropdown === cat.value && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 6 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute top-full left-0 bg-white border border-slate-100 rounded-md shadow-lg py-1.5 min-w-[220px] z-50"
+                      >
+                        {cat.subcategories.map((sub) => (
+                          <button
+                            key={sub.value}
+                            onClick={() => handleSubCategoryClick(cat.value, sub.value)}
+                            className="w-full text-left px-5 py-2.5 text-sm text-slate-600 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                          >
+                            {sub.label}
+                          </button>
+                        ))}
+                        <div className="border-t border-slate-100 my-1" />
+                        <button
+                          onClick={() => handleCategoryClick(cat.value)}
+                          className="w-full text-left px-5 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition-colors uppercase tracking-wider text-[11px]"
+                        >
+                          View All {cat.label}
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
+            </nav>
+
+            {/* Right side actions */}
+            <div className="flex items-center gap-0.5">
+              {/* Search */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSearchOpen(!searchOpen)}
+                className="text-slate-600 hover:text-slate-900 hover:bg-slate-50 h-10 w-10"
+              >
+                <Search className="h-[18px] w-[18px]" />
+              </Button>
+
+              {/* Wishlist */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden sm:flex text-slate-600 hover:text-slate-900 hover:bg-slate-50 h-10 w-10"
+              >
+                <Heart className="h-[18px] w-[18px]" />
+              </Button>
+
+              {/* Account */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden sm:flex text-slate-600 hover:text-slate-900 hover:bg-slate-50 h-10 w-10"
+              >
+                <User className="h-[18px] w-[18px]" />
+              </Button>
+
+              {/* Cart */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setView('cart')}
+                className="relative text-slate-600 hover:text-slate-900 hover:bg-slate-50 h-10 w-10"
+              >
+                <ShoppingCart className="h-[18px] w-[18px]" />
+                {count > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-rose-600 text-[9px] font-bold text-white min-w-[18px]">
+                    {count > 99 ? '99+' : count}
+                  </span>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Search Bar Overlay */}
+      {/* Search Bar Overlay - Clean white styling */}
       <AnimatePresence>
         {searchOpen && (
           <motion.div
@@ -402,16 +406,22 @@ export function Header() {
                     placeholder="Search for bags, shoes, accessories..."
                     value={searchValue}
                     onChange={(e) => setSearchValue(e.target.value)}
-                    className="pl-9 rounded-lg border-slate-200 h-11"
+                    className="pl-9 rounded-full border-slate-200 h-11 text-sm focus:border-slate-400 focus:ring-slate-400/20"
                     autoFocus
                   />
                 </div>
+                <Button
+                  type="submit"
+                  className="bg-slate-900 hover:bg-slate-800 text-white rounded-full px-6 h-11 text-sm font-medium"
+                >
+                  Search
+                </Button>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   onClick={() => { setSearchOpen(false); setSearchValue('') }}
-                  className="text-slate-400 hover:text-slate-600"
+                  className="text-slate-400 hover:text-slate-600 h-11 w-11"
                 >
                   <X className="h-5 w-5" />
                 </Button>

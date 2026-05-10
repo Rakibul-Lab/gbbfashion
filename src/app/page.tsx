@@ -5,9 +5,13 @@ import { useStore, ViewType } from '@/lib/store'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { HeroSection } from '@/components/hero-section'
+import { PromoBanners } from '@/components/promo-banners'
 import { CategoryCards } from '@/components/category-cards'
 import { PopularProducts } from '@/components/popular-products'
 import { FeaturedCollections } from '@/components/featured-collections'
+import { NewInTrend } from '@/components/new-in-trend'
+import { CategoryShowcase } from '@/components/category-showcase'
+import { StoriesSection } from '@/components/stories-section'
 import { TrustBar } from '@/components/trust-bar'
 import { ProductGrid } from '@/components/product-grid'
 import { ProductDetail } from '@/components/product-detail'
@@ -22,7 +26,12 @@ function ViewRenderer({ view }: { view: ViewType }) {
     case 'home':
       return (
         <>
+          <HeroSection />
           <FeaturedCollections />
+          <NewInTrend />
+          <PromoBanners />
+          <CategoryShowcase />
+          <StoriesSection />
           <TrustBar />
         </>
       )
