@@ -6,7 +6,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { motion } from 'framer-motion'
 import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft } from 'lucide-react'
-import Image from 'next/image'
 
 export function CartView() {
   const { cart, updateQuantity, removeFromCart, cartTotal, setView } = useStore()
@@ -68,11 +67,9 @@ export function CartView() {
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex gap-4">
                       <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-lg overflow-hidden bg-slate-100 shrink-0">
-                        <Image
+                        <img
                           src={item.image}
                           alt={item.name}
-                          width={96}
-                          height={96}
                           className="h-full w-full object-cover"
                         />
                       </div>
