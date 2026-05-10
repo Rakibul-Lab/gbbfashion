@@ -2,7 +2,7 @@
 
 import { useStore } from '@/lib/store'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShoppingBag } from 'lucide-react'
+import { ShoppingBag, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState, useRef, useEffect, useCallback } from 'react'
 
 interface ReelProduct {
@@ -63,8 +63,16 @@ const reelProducts: ReelProduct[] = [
   },
 ]
 
-function ReelCard({ product, index }: { product: ReelProduct; index: number }) {
-  const { addToCart, selectProduct, setView } = useStore()
+function ReelCard({
+  product,
+  index,
+  onOpen,
+}: {
+  product: ReelProduct
+  index: number
+  onOpen: () => void
+}) {
+  const { addToCart } = useStore()
   const [showOverlay, setShowOverlay] = useState(false)
   const [isInViewport, setIsInViewport] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -91,9 +99,7 @@ function ReelCard({ product, index }: { product: ReelProduct; index: number }) {
     if (!video) return
 
     if (isInViewport) {
-      video.play().catch(() => {
-        // Autoplay blocked, will show poster
-      })
+      video.play().catch(() => {})
     } else {
       video.pause()
     }
@@ -111,11 +117,6 @@ function ReelCard({ product, index }: { product: ReelProduct; index: number }) {
     setTimeout(() => setShowOverlay(false), 1500)
   }, [addToCart, product])
 
-  const handleProductClick = useCallback(() => {
-    selectProduct(product.id)
-    setView('product')
-  }, [selectProduct, setView, product.id])
-
   const discount = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0
@@ -126,16 +127,17 @@ function ReelCard({ product, index }: { product: ReelProduct; index: number }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-30px' }}
       transition={{
-        delay: index * 0.1,
+        delay: index * 0.08,
         duration: 0.5,
         ease: [0.25, 0.46, 0.45, 0.94],
       }}
-      className="flex-shrink-0 w-[220px] sm:w-[240px] md:w-[260px] group"
+      className="group"
     >
-      {/* Video Card — autoplay, muted, looping, no controls */}
+      {/* Video Card — click to open modal */}
       <div
         ref={cardRef}
-        className="relative aspect-[9/16] overflow-hidden rounded-lg bg-slate-900"
+        className="relative aspect-[9/16] overflow-hidden rounded-lg bg-slate-900 cursor-pointer hover:ring-2 hover:ring-white/40 transition-all duration-300"
+        onClick={onOpen}
       >
         {/* Video element — autoplay, muted, continuous loop */}
         <video
@@ -165,13 +167,7 @@ function ReelCard({ product, index }: { product: ReelProduct; index: number }) {
         <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 pointer-events-none">
           {/* Product thumbnail + name row */}
           <div className="flex items-center gap-2.5 mb-2.5">
-            <div
-              className="w-10 h-10 rounded-md overflow-hidden flex-shrink-0 border border-white/20 pointer-events-auto cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleProductClick()
-              }}
-            >
+            <div className="w-10 h-10 rounded-md overflow-hidden flex-shrink-0 border border-white/20">
               <img
                 src={product.thumbnail}
                 alt={product.name}
@@ -236,98 +232,238 @@ function ReelCard({ product, index }: { product: ReelProduct; index: number }) {
   )
 }
 
-export function StoriesSection() {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(true)
+/* Full-screen reel modal with navigation */
+function ReelModal({
+  products,
+  initialIndex,
+  onClose,
+}: {
+  products: ReelProduct[]
+  initialIndex: number
+  onClose: () => void
+}) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const { addToCart } = useStore()
 
-  const checkScroll = useCallback(() => {
-    if (scrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current
-      setCanScrollLeft(scrollLeft > 5)
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 5)
+  const product = products[currentIndex]
+
+  // Autoplay video when modal opens or index changes
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    video.currentTime = 0
+    video.play().catch(() => {})
+  }, [currentIndex])
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
     }
   }, [])
 
-  useEffect(() => {
-    checkScroll()
-    const el = scrollRef.current
-    if (el) {
-      el.addEventListener('scroll', checkScroll, { passive: true })
-      return () => el.removeEventListener('scroll', checkScroll)
-    }
-  }, [checkScroll])
+  const goNext = useCallback(() => {
+    setCurrentIndex((prev) => (prev + 1) % products.length)
+  }, [products.length])
 
-  const scroll = useCallback((direction: 'left' | 'right') => {
-    if (scrollRef.current) {
-      const scrollAmount = direction === 'left' ? -280 : 280
-      scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
+  const goPrev = useCallback(() => {
+    setCurrentIndex((prev) => (prev - 1 + products.length) % products.length)
+  }, [products.length])
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowRight') goNext()
+      if (e.key === 'ArrowLeft') goPrev()
     }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose, goNext, goPrev])
+
+  const discount = product.originalPrice
+    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+    : 0
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+      onClick={onClose}
+    >
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-50 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 flex items-center justify-center transition-colors"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Previous arrow */}
+      <button
+        onClick={(e) => { e.stopPropagation(); goPrev() }}
+        className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-50 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 flex items-center justify-center transition-colors"
+      >
+        <ChevronLeft className="w-6 h-6" />
+      </button>
+
+      {/* Next arrow */}
+      <button
+        onClick={(e) => { e.stopPropagation(); goNext() }}
+        className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-50 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 flex items-center justify-center transition-colors"
+      >
+        <ChevronRight className="w-6 h-6" />
+      </button>
+
+      {/* Video container */}
+      <motion.div
+        key={product.id}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        transition={{ duration: 0.25 }}
+        className="relative w-[320px] sm:w-[380px] md:w-[420px] max-h-[85vh] aspect-[9/16] rounded-xl overflow-hidden bg-slate-900"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Video */}
+        <video
+          ref={videoRef}
+          src={product.videoSrc}
+          poster={product.videoThumbnail}
+          muted
+          loop
+          autoPlay
+          playsInline
+          className="w-full h-full object-cover"
+        />
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
+
+        {/* Indicator dots */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-1.5 pointer-events-none">
+          {products.map((_, i) => (
+            <div
+              key={i}
+              className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                i === currentIndex ? 'bg-white w-4' : 'bg-white/40'
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Sale badge */}
+        {discount > 0 && (
+          <div className="absolute top-12 left-4 pointer-events-none">
+            <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-sm">
+              -{discount}%
+            </span>
+          </div>
+        )}
+
+        {/* Bottom info */}
+        <div className="absolute bottom-0 left-0 right-0 p-5 pointer-events-none">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 border border-white/20">
+              <img src={product.thumbnail} alt={product.name} className="w-full h-full object-cover" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-sm font-semibold leading-tight truncate">{product.name}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-white font-bold text-base">৳{product.price.toLocaleString()}</span>
+                {product.originalPrice && (
+                  <span className="text-white/50 text-xs line-through">৳{product.originalPrice.toLocaleString()}</span>
+                )}
+                {discount > 0 && (
+                  <span className="text-red-400 text-[10px] font-bold">-{discount}%</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              addToCart({
+                productId: product.id,
+                name: product.name,
+                price: product.price,
+                image: product.thumbnail,
+              })
+            }}
+            className="pointer-events-auto w-full bg-black hover:bg-slate-800 text-white text-sm font-semibold tracking-wider uppercase py-3 rounded-lg flex items-center justify-center gap-2 transition-colors duration-200"
+          >
+            <ShoppingBag className="w-4 h-4" />
+            Add To Cart
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+export function StoriesSection() {
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalIndex, setModalIndex] = useState(0)
+
+  const openModal = useCallback((index: number) => {
+    setModalIndex(index)
+    setModalOpen(true)
+  }, [])
+
+  const closeModal = useCallback(() => {
+    setModalOpen(false)
   }, [])
 
   return (
-    <section className="py-12 sm:py-16 lg:py-20 bg-white">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-8 sm:mb-10"
-        >
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-[0.15em] text-slate-900">
-            STORIES THAT LEAD
-          </h2>
-          <div className="mt-3 mx-auto w-12 h-0.5 bg-amber-500" />
-          <p className="mt-3 text-slate-500 text-xs sm:text-sm max-w-md mx-auto tracking-wide">
-            Watch our latest reels and shop the look instantly
-          </p>
-        </motion.div>
-
-        {/* Reels Carousel */}
-        <div className="relative">
-          {/* Scroll Left Arrow */}
-          {canScrollLeft && (
-            <button
-              onClick={() => scroll('left')}
-              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-10 w-9 h-9 rounded-full bg-white shadow-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors"
-            >
-              <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-          )}
-
-          {/* Scrollable Reels Container */}
-          <div
-            ref={scrollRef}
-            className="flex gap-4 sm:gap-5 overflow-x-auto scrollbar-hide pb-4 px-1 snap-x snap-mandatory"
+    <>
+      <section className="py-12 sm:py-16 lg:py-20 bg-white">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          {/* Section Header */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-8 sm:mb-10"
           >
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-[0.15em] text-slate-900">
+              STORIES THAT LEAD
+            </h2>
+            <div className="mt-3 mx-auto w-12 h-0.5 bg-amber-500" />
+            <p className="mt-3 text-slate-500 text-xs sm:text-sm max-w-md mx-auto tracking-wide">
+              Watch our latest reels and shop the look instantly
+            </p>
+          </motion.div>
+
+          {/* 5 Reels in full-width grid — no slider */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 sm:gap-5">
             {reelProducts.map((product, index) => (
-              <div key={product.id} className="snap-start">
-                <ReelCard product={product} index={index} />
-              </div>
+              <ReelCard
+                key={product.id}
+                product={product}
+                index={index}
+                onOpen={() => openModal(index)}
+              />
             ))}
           </div>
-
-          {/* Scroll Right Arrow */}
-          {canScrollRight && (
-            <button
-              onClick={() => scroll('right')}
-              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 z-10 w-9 h-9 rounded-full bg-white shadow-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors"
-            >
-              <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          )}
-
-          {/* Fade edges */}
-          <div className="absolute top-0 left-0 w-8 h-full bg-gradient-to-r from-white to-transparent pointer-events-none z-[5]" />
-          <div className="absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-white to-transparent pointer-events-none z-[5]" />
         </div>
-      </div>
-    </section>
+      </section>
+
+      {/* Full-screen reel modal */}
+      <AnimatePresence>
+        {modalOpen && (
+          <ReelModal
+            products={reelProducts}
+            initialIndex={modalIndex}
+            onClose={closeModal}
+          />
+        )}
+      </AnimatePresence>
+    </>
   )
 }
