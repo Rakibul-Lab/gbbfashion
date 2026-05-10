@@ -22,10 +22,7 @@ function ViewRenderer({ view }: { view: ViewType }) {
     case 'home':
       return (
         <>
-          <HeroSection />
           <FeaturedCollections />
-          <CategoryCards />
-          <PopularProducts />
           <TrustBar />
         </>
       )
