@@ -2,19 +2,183 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Zap, Star } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { featuredProducts, type FeaturedProduct, type ColorVariant } from '@/lib/featured-products'
+import { useStore } from '@/lib/store'
 
-type CollectionTab = 'bags' | 'shoes'
+type ToteBackpackTab = 'tote' | 'backpack'
 
-const tabs: { value: CollectionTab; label: string }[] = [
-  { value: 'bags', label: 'Prime Bags' },
-  { value: 'shoes', label: 'Prime Shoes' },
+const tabs: { value: ToteBackpackTab; label: string }[] = [
+  { value: 'tote', label: 'TOTE' },
+  { value: 'backpack', label: 'BACKPACK' },
+]
+
+interface ToteBackpackProduct {
+  id: string
+  name: string
+  price: number
+  originalPrice: number
+  discountPercent: number
+  image: string
+  secondaryImage: string
+  rating: number
+  colors: { name: string; swatch: string }[]
+}
+
+const toteProducts: ToteBackpackProduct[] = [
+  {
+    id: 'tote-1',
+    name: 'Classic Leather Tote',
+    price: 2499,
+    originalPrice: 3299,
+    discountPercent: 24,
+    image: '/tote-featured.jpg',
+    secondaryImage: '/products/featured/shoulder-bag.png',
+    rating: 4.5,
+    colors: [
+      { name: 'Black', swatch: '#1a1a1a' },
+      { name: 'Brown', swatch: '#8B4513' },
+      { name: 'Tan', swatch: '#D2B48C' },
+    ],
+  },
+  {
+    id: 'tote-2',
+    name: 'Structured Office Tote',
+    price: 1899,
+    originalPrice: 2699,
+    discountPercent: 30,
+    image: '/products/featured/shoulder-bag.png',
+    secondaryImage: '/products/featured/cosmetic-bag.png',
+    rating: 4.3,
+    colors: [
+      { name: 'Navy', swatch: '#1B2A4A' },
+      { name: 'Blush', swatch: '#DE7E7E' },
+    ],
+  },
+  {
+    id: 'tote-3',
+    name: 'Weekend Tote Bag',
+    price: 2199,
+    originalPrice: 3099,
+    discountPercent: 29,
+    image: '/products/featured/cosmetic-bag.png',
+    secondaryImage: '/products/featured/crossbody-bag.png',
+    rating: 4.7,
+    colors: [
+      { name: 'Olive', swatch: '#556B2F' },
+      { name: 'Cream', swatch: '#F5F0E1' },
+      { name: 'Rust', swatch: '#B7410E' },
+    ],
+  },
+  {
+    id: 'tote-4',
+    name: 'Mini Tote Crossbody',
+    price: 1299,
+    originalPrice: 1899,
+    discountPercent: 32,
+    image: '/products/featured/crossbody-bag.png',
+    secondaryImage: '/products/featured/dumpling-bag.png',
+    rating: 4.1,
+    colors: [
+      { name: 'Black', swatch: '#1a1a1a' },
+      { name: 'Dusty Rose', swatch: '#DCAE96' },
+    ],
+  },
+  {
+    id: 'tote-5',
+    name: 'Oversized Shopper Tote',
+    price: 1799,
+    originalPrice: 2499,
+    discountPercent: 28,
+    image: '/products/featured/dumpling-bag.png',
+    secondaryImage: '/tote-featured.jpg',
+    rating: 4.4,
+    colors: [
+      { name: 'Beige', swatch: '#C8AD7F' },
+      { name: 'Charcoal', swatch: '#3a3a3a' },
+      { name: 'Wine', swatch: '#722F37' },
+    ],
+  },
+]
+
+const backpackProducts: ToteBackpackProduct[] = [
+  {
+    id: 'backpack-1',
+    name: 'Urban Leather Backpack',
+    price: 2899,
+    originalPrice: 3799,
+    discountPercent: 24,
+    image: '/backpack-featured.jpg',
+    secondaryImage: '/products/featured/duffle-bag.png',
+    rating: 4.6,
+    colors: [
+      { name: 'Black', swatch: '#1a1a1a' },
+      { name: 'Cognac', swatch: '#9A463D' },
+      { name: 'Espresso', swatch: '#3C1414' },
+    ],
+  },
+  {
+    id: 'backpack-2',
+    name: 'Travel Laptop Backpack',
+    price: 1999,
+    originalPrice: 2899,
+    discountPercent: 31,
+    image: '/products/featured/duffle-bag.png',
+    secondaryImage: '/products/featured/butterfly-bag.png',
+    rating: 4.4,
+    colors: [
+      { name: 'Slate', swatch: '#708090' },
+      { name: 'Midnight', swatch: '#191970' },
+    ],
+  },
+  {
+    id: 'backpack-3',
+    name: 'Mini Backpack',
+    price: 1499,
+    originalPrice: 2199,
+    discountPercent: 32,
+    image: '/products/featured/butterfly-bag.png',
+    secondaryImage: '/products/featured/twill-bag.png',
+    rating: 4.2,
+    colors: [
+      { name: 'Blush', swatch: '#DE7E7E' },
+      { name: 'Black', swatch: '#1a1a1a' },
+      { name: 'Lavender', swatch: '#967BB6' },
+    ],
+  },
+  {
+    id: 'backpack-4',
+    name: 'Classic Rucksack',
+    price: 2299,
+    originalPrice: 3199,
+    discountPercent: 28,
+    image: '/products/featured/twill-bag.png',
+    secondaryImage: '/products/featured/smart-wallet.png',
+    rating: 4.8,
+    colors: [
+      { name: 'Olive', swatch: '#556B2F' },
+      { name: 'Tan', swatch: '#D2B48C' },
+    ],
+  },
+  {
+    id: 'backpack-5',
+    name: 'Convertible Backpack',
+    price: 1699,
+    originalPrice: 2399,
+    discountPercent: 29,
+    image: '/products/featured/smart-wallet.png',
+    secondaryImage: '/backpack-featured.jpg',
+    rating: 4.3,
+    colors: [
+      { name: 'Black', swatch: '#1a1a1a' },
+      { name: 'Burgundy', swatch: '#722F37' },
+      { name: 'Camel', swatch: '#C19A6B' },
+    ],
+  },
 ]
 
 // Custom Star Rating matching thepatchee.com style
-function StarRating({ rating, reviewCount }: { rating: number; reviewCount: number }) {
+function StarRating({ rating }: { rating: number }) {
   const fullStars = Math.floor(rating)
   const hasHalf = rating - fullStars >= 0.3
 
@@ -64,7 +228,15 @@ function StarRating({ rating, reviewCount }: { rating: number; reviewCount: numb
 }
 
 // Color swatch component
-function ColorSwatches({ colors, selectedColor, onColorSelect }: { colors: ColorVariant[]; selectedColor: number; onColorSelect: (index: number) => void }) {
+function ColorSwatches({
+  colors,
+  selectedColor,
+  onColorSelect,
+}: {
+  colors: { name: string; swatch: string }[]
+  selectedColor: number
+  onColorSelect: (index: number) => void
+}) {
   return (
     <fieldset className="flex items-center justify-center flex-wrap gap-1.5 mt-2.5">
       <legend className="sr-only">Color</legend>
@@ -106,10 +278,9 @@ function ColorSwatches({ colors, selectedColor, onColorSelect }: { colors: Color
 }
 
 // Product Card
-function ProductCard({ product, index }: { product: FeaturedProduct; index: number }) {
+function ProductCard({ product, index }: { product: ToteBackpackProduct; index: number }) {
   const [selectedColor, setSelectedColor] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
-  const [imageLoaded, setImageLoaded] = useState(false)
 
   return (
     <motion.div
@@ -133,7 +304,6 @@ function ProductCard({ product, index }: { product: FeaturedProduct; index: numb
               isHovered ? 'opacity-0' : 'opacity-100'
             }`}
             loading="lazy"
-            onLoad={() => setImageLoaded(true)}
           />
           {/* Secondary Image (on hover) */}
           <img
@@ -153,16 +323,10 @@ function ProductCard({ product, index }: { product: FeaturedProduct; index: numb
           </div>
 
           {/* Sale Badge - Top Right */}
-          <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+          <div className="absolute top-2 right-2">
             <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold tracking-wide text-white bg-rose-600 rounded-sm leading-tight">
               Save {product.discountPercent}%
             </span>
-            {/* Flash Delivery Badge */}
-            {product.hasFlash && (
-              <div className="flex items-center justify-center w-5 h-5 bg-amber-400 rounded-full">
-                <Zap className="w-3 h-3 text-amber-900 fill-amber-900" />
-              </div>
-            )}
           </div>
         </div>
 
@@ -177,7 +341,7 @@ function ProductCard({ product, index }: { product: FeaturedProduct; index: numb
             {/* Price */}
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-rose-600">
-                {product.priceFrom && 'From '}৳ {product.price.toLocaleString()}
+                ৳ {product.price.toLocaleString()}
               </span>
               <span className="text-sm text-slate-400 line-through">
                 ৳ {product.originalPrice.toLocaleString()}
@@ -192,7 +356,7 @@ function ProductCard({ product, index }: { product: FeaturedProduct; index: numb
             />
 
             {/* Rating */}
-            <StarRating rating={product.rating} reviewCount={product.reviewCount} />
+            <StarRating rating={product.rating} />
           </div>
         </div>
       </div>
@@ -200,14 +364,15 @@ function ProductCard({ product, index }: { product: FeaturedProduct; index: numb
   )
 }
 
-export function FeaturedCollections() {
-  const [activeTab, setActiveTab] = useState<CollectionTab>('bags')
+export function ToteBackpack() {
+  const { setView, setCategoryFilter } = useStore()
+  const [activeTab, setActiveTab] = useState<ToteBackpackTab>('tote')
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
 
   const filteredProducts = useMemo(
-    () => featuredProducts.filter((p) => p.collection === activeTab),
+    () => (activeTab === 'tote' ? toteProducts : backpackProducts),
     [activeTab]
   )
 
@@ -231,7 +396,6 @@ export function FeaturedCollections() {
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = 0
-      // Small delay to allow re-render before checking scroll
       setTimeout(checkScroll, 100)
     }
   }, [activeTab, checkScroll])
@@ -264,7 +428,7 @@ export function FeaturedCollections() {
               {tab.label}
               {activeTab === tab.value && (
                 <motion.div
-                  layoutId="featured-tab-underline"
+                  layoutId="tote-backpack-tab-underline"
                   className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 rounded-full"
                   transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
                 />
@@ -330,13 +494,17 @@ export function FeaturedCollections() {
           </AnimatePresence>
         </div>
 
-        {/* View All Button */}
+        {/* Carry Confidence Button */}
         <div className="flex justify-center mt-8 sm:mt-10">
           <Button
+            onClick={() => {
+              setCategoryFilter(activeTab === 'tote' ? 'tote' : 'backpack')
+              setView('shop')
+            }}
             variant="outline"
             className="px-10 py-2.5 text-sm font-semibold tracking-widest uppercase border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white transition-all duration-300 rounded-sm"
           >
-            View all
+            Carry Confidence
           </Button>
         </div>
       </div>

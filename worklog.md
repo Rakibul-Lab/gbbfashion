@@ -245,3 +245,251 @@ Stage Summary:
 - Videos autoplay with continuous loop, no pause or sound buttons
 - Clean reel card design: sale badge, product info, Add To Cart only
 - All video and thumbnail assets serving correctly (200 status)
+
+---
+Task ID: 2
+Agent: Trending Badge Agent
+Task: Update FeaturedCollections component to add "TRENDING" labels
+
+Work Log:
+- Read worklog.md to understand previous agent work
+- Read /src/components/featured-collections.tsx to understand current ProductCard badge layout
+- Modified the ProductCard component's badge positioning:
+  - Added "TRENDING" badge at top-left of product image: black background, white text, text-[9px] font-bold tracking-widest uppercase, rounded-sm
+  - Moved existing "Save X%" sale badge from top-left to top-right (bg-rose-600 preserved)
+  - Moved flash delivery badge (Zap icon) into the same top-right flex column container below the sale badge
+  - Both right-side badges use items-end alignment for consistent positioning
+- ESLint: No errors
+
+Stage Summary:
+- Product cards now show "TRENDING" badge (black bg, white text) at top-left
+- Sale "Save X%" badge moved to top-right
+- Flash delivery badge stays in top-right column below sale badge
+- All lint checks pass
+
+---
+Task ID: 3
+Agent: Promo Banner Redesign Agent
+Task: Redesign PromoBanners component for the Prime Drop banner
+
+Work Log:
+- Read /home/z/my-project/worklog.md to understand previous agent work
+- Read /src/components/promo-banners.tsx to understand current implementation (2 banners: Prime Drop + Luxe Leather)
+- Completely redesigned the PromoBanners component:
+  - Removed Luxe Leather banner entirely (to be moved to its own component)
+  - Redesigned Prime Drop banner with centered layout instead of left-aligned:
+    - "PATCHEE TOP PICKS" small uppercase text with tracking-[0.3em] in white/60
+    - "THE PRIME DROP" large serif-style typography (Georgia/Times New Roman) in white, font-light, text-4xl to xl:text-8xl responsive sizing
+    - "UPTO 50% OFF" large bold white text, text-3xl to xl:text-7xl responsive sizing
+    - "View All" CTA button: black background, white text, border-white/20, hover inverts to white bg/black text
+  - Background: /public/banner-prime-drop.png as cover image with dark navy/black gradient fallback
+  - Overlay: multi-layer dark overlays (center black/50 + horizontal gradient + vertical gradient) for text readability
+  - Removed parallax background-attachment: fixed (simpler approach)
+  - Kept framer-motion scroll-triggered animations with staggered delays
+  - Kept useStore navigation (setCategoryFilter + setView)
+  - Responsive heights: 60vh/70vh/80vh with 400px min-height
+- ESLint: No errors
+- Dev server compiles successfully
+
+Stage Summary:
+- PromoBanners redesigned with single Prime Drop banner, centered text layout
+- Elegant serif typography for "THE PRIME DROP" heading
+- "PATCHEE TOP PICKS" label + "UPTO 50% OFF" discount + "View All" CTA
+- Luxe Leather banner removed (to be separate component)
+- All lint checks pass
+
+---
+Task ID: 4
+Agent: NewInTrend Tab Navigation Agent
+Task: Update NewInTrend component to have NEW IN TREND / NEW ARRIVALS tabs
+
+Work Log:
+- Read worklog.md to understand previous agent work
+- Read /src/components/new-in-trend.tsx (current implementation with "What's Hot" header + single product list)
+- Read /src/components/featured-collections.tsx (reference for tab styling pattern)
+- Read /src/lib/featured-products.ts (product data with hasFlash field)
+- Completely rewrote the NewInTrend component:
+  - Replaced "What's Hot" subtitle + "New in Trend" heading with two tab buttons:
+    - Tab 1: "NEW IN TREND" — shows products where hasFlash === true (12 products)
+    - Tab 2: "NEW ARRIVALS" — shows products where hasFlash === false (4 products)
+  - Tab styling matches FeaturedCollections: large text (2xl/3xl/4xl), active tab bold with underline (framer-motion layoutId animated), inactive tab light gray (slate-300) with hover effect
+  - Each product card has "TRENDING" badge (black bg, white text) at top-left of image
+  - Sale "Save X%" badge at top-right of image
+  - Removed Flash/Zap badge from product cards (no longer needed with tab separation)
+  - Added AnimatePresence with fade transitions when switching tabs
+  - Added carousel navigation arrows (prev/next) with AnimatePresence show/hide matching FeaturedCollections style
+  - Kept scroll functionality (mobile horizontal scroll, desktop grid layout)
+  - Kept View All button with ArrowRight icon and hover animation
+  - Used useMemo for filtered products based on active tab
+  - Scroll position resets to left when switching tabs
+- ESLint: No errors
+- Dev server compiles successfully
+
+Stage Summary:
+- NewInTrend component now has two tabs: "NEW IN TREND" and "NEW ARRIVALS"
+- Tab navigation styled identically to FeaturedCollections (large text, bold + underline for active)
+- "TRENDING" badge (black bg, white text) on each product card image top-left
+- Sale badge at top-right of each product card image
+- Products filtered by hasFlash: trending (hasFlash) vs arrivals (!hasFlash)
+- Smooth tab transitions with framer-motion AnimatePresence
+- All lint checks pass
+
+---
+Task ID: 5
+Agent: BackpackSeries Component Agent
+Task: Create the BackpackSeries component
+
+Work Log:
+- Read worklog.md to understand previous agent work
+- Read store.ts to understand available navigation methods (setView, setCategoryFilter)
+- Read page.tsx to understand current home view layout and component order
+- Verified image assets exist: /backpack-series.jpg, /shoulder-bags-collection.jpg, /handbags-collection.jpg
+- Created /src/components/backpack-series.tsx with:
+  - Section heading: "TIMELESS. BOLD. UNSTOPPABLE." in large bold tracking-widest uppercase text, centered
+  - 2-column grid layout (sm:grid-cols-2):
+    - Left column: large backpack image spanning 2 rows (sm:row-span-2), with min-height on sm+ for tall portrait display
+    - Right column: two stacked cards (Shoulder Bags top, Handbags bottom), each with aspect-[4/3]
+  - Each card: image with dark gradient overlay from bottom, white bold tracking-widest uppercase text at bottom
+  - Hover effects: image scales to 105% (group-hover:scale-105), gradient darkens on hover, text translates up slightly
+  - Clickable cards using useStore (setCategoryFilter + setView) for navigation
+  - Framer-motion whileInView entrance animations with staggered delays (0.1, 0.2, 0.3)
+  - Responsive: stacks vertically on mobile (single column), shows 2-column layout on sm+
+- Updated /src/app/page.tsx:
+  - Added BackpackSeries import
+  - Placed component between CategoryShowcase and StoriesSection in home view
+- ESLint: No errors
+- Dev server compiles successfully
+
+Stage Summary:
+- BackpackSeries component created with 3-image grid layout (1 large + 2 stacked)
+- Heading "TIMELESS. BOLD. UNSTOPPABLE." with bold tracking-widest uppercase styling
+- Hover effects: image scale, gradient brightening, text lift
+- Framer-motion scroll-triggered entrance animations
+- Responsive layout: mobile stack, desktop 2-column grid
+- All lint checks pass
+
+---
+Task ID: 7
+Agent: LuxeLeatherBags Component Agent
+Task: Create the LuxeLeatherBags component
+
+Work Log:
+- Read worklog.md to understand previous agent work (PromoBanners had Luxe Leather banner removed for separate component)
+- Read store.ts to understand available navigation methods (setView, setCategoryFilter)
+- Read page.tsx to understand current home view layout and component order
+- Verified image asset exists: /public/luxe-leather-bags.jpg
+- Created /src/components/luxe-leather-bags.tsx with:
+  - Full-width section with black background (bg-black)
+  - 2-column layout on md+ (text left, image right), stacked on mobile (image top, text bottom)
+  - Left side (text, vertically centered):
+    - "Luxe Leather" in large serif italic white text (Georgia/Times New Roman, text-5xl to xl:text-8xl responsive)
+    - "Bags" in amber-400 (text-amber-400) bold serif text below
+    - "Premium. Bold. Yours." subtitle in white/70, tracking-[0.25em] uppercase
+    - Decorative amber gradient line separator (amber-400 to amber-600, origin-left animation)
+    - Description paragraph in white/60 about premium leather craftsmanship
+    - "EXPLORE COLLECTION" CTA button: white border + text, hover inverts to white bg/black text
+  - Right side (image):
+    - /luxe-leather-bags.jpg in object-cover, fills section height
+    - md:flex-[1.2] for 50-60% width on desktop
+    - Warm amber vignette overlay with gradient-to-left and radial amber glow at bottom right
+  - Subtle warm amber vignette/glow effects on the whole section (radial gradients)
+  - Framer-motion whileInView entrance animations with staggered delays
+  - Responsive: min-h-[70vh] on md, min-h-[80vh] on desktop
+  - Uses useStore (setCategoryFilter('Bags') + setView('shop')) for navigation
+- Updated /src/app/page.tsx:
+  - Added LuxeLeatherBags import
+  - Placed component between PromoBanners and CategoryShowcase in home view
+- ESLint: No errors
+- Dev server compiles successfully
+
+Stage Summary:
+- LuxeLeatherBags component created with 2-column black background layout
+- Serif italic "Luxe Leather" + amber "Bags" heading design
+- "Premium. Bold. Yours." subtitle with amber line separator
+- Image with warm amber vignette overlay
+- Framer-motion scroll-triggered entrance animations
+- Responsive layout with mobile-first stacking
+- All lint checks pass
+
+---
+Task ID: 6
+Agent: BagTheVibe Component Agent
+Task: Create the BagTheVibe component matching thepatchee.com design
+
+Work Log:
+- Read worklog.md to understand previous agent work and project context
+- Read store.ts to understand available navigation methods (setView, selectProduct)
+- Read page.tsx to understand current homepage layout and component ordering
+- Verified image assets exist: /bag-the-vibe.jpg and /products/featured/butterfly-bag.png
+- Created /src/components/bag-the-vibe.tsx with:
+  - "BAG THE VIBE" section heading: large bold tracking-widest uppercase text, centered, with decorative line below
+  - 2-column grid layout (mobile: stacked vertically, md+: side by side)
+  - Left column: lifestyle image (/bag-the-vibe.jpg) with aspect-[3/4], dark gradient overlay at bottom, tagline "Style that speaks before you do"
+  - Right column: product display with:
+    - "TRENDING" badge (black bg, white text, tracking-widest uppercase)
+    - Butterfly Design Shoulder Bag product image (/products/featured/butterfly-bag.png)
+    - Product name: "Butterfly Design Shoulder Bag"
+    - Price: ৳1,025 with strikethrough ৳2,562
+    - "VIEW PRODUCT" button (black bg, white text, tracking-widest uppercase, hover gap animation with ArrowRight icon)
+  - framer-motion entrance animations: whileInView fade-in-up with staggered delays for each element
+  - Hover effects: image scale-105 on lifestyle image, scale-105 on product image, gap animation on button
+  - useStore navigation: selectProduct + setView on VIEW PRODUCT click
+  - Clean, minimal design with good spacing (py-16/py-24 section padding, gap-4/gap-6 grid)
+- Added BagTheVibe to page.tsx home view between BackpackSeries and StoriesSection
+- All lint checks pass with no errors
+- Dev server compiles successfully
+
+Stage Summary:
+- Complete BagTheVibe component matching thepatchee.com design
+- 2-column layout: lifestyle image left, product display right
+- TRENDING badge, product image, name, price with strikethrough, VIEW PRODUCT button
+- Scroll-triggered framer-motion animations with staggered delays
+- Hover effects on images and button
+- Integrated into homepage flow
+
+---
+Task ID: 8
+Agent: ToteBackpack Component Agent
+Task: Create the ToteBackpack component
+
+Work Log:
+- Read worklog.md to understand previous agent work
+- Read store.ts to understand available navigation methods (setView, setCategoryFilter)
+- Read featured-collections.tsx as reference for tab styling and product card design
+- Read new-in-trend.tsx as additional reference for tab navigation pattern
+- Read page.tsx to understand current home view layout and component order
+- Created /src/components/tote-backpack.tsx with:
+  - TOTE / BACKPACK tab navigation matching FeaturedCollections style:
+    - Large text (2xl/3xl/4xl), active tab bold with underline (framer-motion layoutId animated), inactive tab light gray (slate-300)
+  - Inline product data: 5 tote products + 5 backpack products
+    - TOTE: Classic Leather Tote, Structured Office Tote, Weekend Tote Bag, Mini Tote Crossbody, Oversized Shopper Tote
+    - BACKPACK: Urban Leather Backpack, Travel Laptop Backpack, Mini Backpack, Classic Rucksack, Convertible Backpack
+    - Each product has: id, name, price, originalPrice, discountPercent, image, secondaryImage, rating, colors
+  - Product cards matching FeaturedCollections style:
+    - Square aspect-ratio image with hover swap (primary → secondary image)
+    - "TRENDING" badge at top-left (black bg, white text, text-[9px] font-bold tracking-widest uppercase)
+    - "Save X%" sale badge at top-right (rose-600 bg, white text)
+    - Product name centered below image
+    - Price with original price strikethrough
+    - Color swatches with checkmark selection (2-3 circles per product)
+    - Custom SVG star rating (#c9a66b gold) matching thepatchee.com style
+  - "CARRY CONFIDENCE" button at bottom center (outline style, tracking-widest uppercase)
+    - Clicking navigates to shop view with category filter based on active tab
+  - Horizontal scrollable carousel with snap scrolling on mobile
+  - Prev/Next navigation arrows with AnimatePresence show/hide
+  - AnimatePresence tab transitions with fade animation
+  - useMemo for filtered products, scroll position resets on tab switch
+  - Uses useStore for navigation (setView, setCategoryFilter)
+  - Responsive: 5 columns on lg via calc widths, scrollable on mobile with snap
+- Updated /src/app/page.tsx:
+  - Added ToteBackpack import
+  - Placed component between NewInTrend and PromoBanners in home view
+- ESLint: No errors
+
+Stage Summary:
+- ToteBackpack component created with TOTE/BACKPACK tab navigation
+- 10 products (5 per tab) with full product card details matching FeaturedCollections style
+- "TRENDING" badges, sale badges, color swatches, star ratings on all cards
+- "CARRY CONFIDENCE" CTA button navigating to shop with category filter
+- Carousel with prev/next arrows, responsive layout
+- All lint checks pass
