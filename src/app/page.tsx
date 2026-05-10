@@ -1,30 +1,47 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { useStore, ViewType } from '@/lib/store'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
-import { HeroSection } from '@/components/hero-section'
-import { FeaturedCollections } from '@/components/featured-collections'
-import { PromoBanners } from '@/components/promo-banners'
-import { NewInTrend } from '@/components/new-in-trend'
-import { StoriesSection } from '@/components/stories-section'
-import { BackpackSeries } from '@/components/backpack-series'
-import { BagTheVibe } from '@/components/bag-the-vibe'
-import { LuxeLeatherBags } from '@/components/luxe-leather-bags'
-import { ToteBackpack } from '@/components/tote-backpack'
-import { OwnItLeadIt } from '@/components/own-it-lead-it'
-import { TrustBar } from '@/components/trust-bar'
-import { ProductGrid } from '@/components/product-grid'
-import { ProductDetail } from '@/components/product-detail'
-import { CartView } from '@/components/cart-view'
-import { CheckoutView } from '@/components/checkout-view'
-import { OrderConfirmation } from '@/components/order-confirmation'
-import { AdminDashboard } from '@/components/admin-dashboard'
-import { LoginForm } from '@/components/auth/login-form'
-import { SignupForm } from '@/components/auth/signup-form'
 import { AuthGuard } from '@/components/auth-guard'
-import { motion, AnimatePresence } from 'framer-motion'
+
+// Dynamic imports for ALL views to reduce initial bundle
+const HeroSection = lazy(() => import('@/components/hero-section').then(m => ({ default: m.HeroSection })))
+const FeaturedCollections = lazy(() => import('@/components/featured-collections').then(m => ({ default: m.FeaturedCollections })))
+const PromoBanners = lazy(() => import('@/components/promo-banners').then(m => ({ default: m.PromoBanners })))
+const NewInTrend = lazy(() => import('@/components/new-in-trend').then(m => ({ default: m.NewInTrend })))
+const StoriesSection = lazy(() => import('@/components/stories-section').then(m => ({ default: m.StoriesSection })))
+const BackpackSeries = lazy(() => import('@/components/backpack-series').then(m => ({ default: m.BackpackSeries })))
+const BagTheVibe = lazy(() => import('@/components/bag-the-vibe').then(m => ({ default: m.BagTheVibe })))
+const LuxeLeatherBags = lazy(() => import('@/components/luxe-leather-bags').then(m => ({ default: m.LuxeLeatherBags })))
+const ToteBackpack = lazy(() => import('@/components/tote-backpack').then(m => ({ default: m.ToteBackpack })))
+const OwnItLeadIt = lazy(() => import('@/components/own-it-lead-it').then(m => ({ default: m.OwnItLeadIt })))
+const TrustBar = lazy(() => import('@/components/trust-bar').then(m => ({ default: m.TrustBar })))
+const ProductGrid = lazy(() => import('@/components/product-grid').then(m => ({ default: m.ProductGrid })))
+const ProductDetail = lazy(() => import('@/components/product-detail').then(m => ({ default: m.ProductDetail })))
+const CartView = lazy(() => import('@/components/cart-view').then(m => ({ default: m.CartView })))
+const CheckoutView = lazy(() => import('@/components/checkout-view').then(m => ({ default: m.CheckoutView })))
+const OrderConfirmation = lazy(() => import('@/components/order-confirmation').then(m => ({ default: m.OrderConfirmation })))
+const AdminDashboard = lazy(() => import('@/components/admin-dashboard').then(m => ({ default: m.AdminDashboard })))
+const LoginForm = lazy(() => import('@/components/auth/login-form').then(m => ({ default: m.LoginForm })))
+const SignupForm = lazy(() => import('@/components/auth/signup-form').then(m => ({ default: m.SignupForm })))
+
+function LoadingSpinner() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-800" />
+    </div>
+  )
+}
+
+function SectionLoader() {
+  return (
+    <div className="h-48 flex items-center justify-center">
+      <div className="h-6 w-6 animate-spin rounded-full border-3 border-slate-200 border-t-amber-600" />
+    </div>
+  )
+}
 
 function ViewRenderer({ view }: { view: ViewType }) {
   const { user, setView } = useStore()
@@ -45,35 +62,35 @@ function ViewRenderer({ view }: { view: ViewType }) {
     case 'home':
       return (
         <>
-          <HeroSection />
-          <FeaturedCollections />
-          <PromoBanners />
-          <NewInTrend />
-          <StoriesSection />
-          <BackpackSeries />
-          <BagTheVibe />
-          <LuxeLeatherBags />
-          <ToteBackpack />
-          <OwnItLeadIt />
-          <TrustBar />
+          <Suspense fallback={<SectionLoader />}><HeroSection /></Suspense>
+          <Suspense fallback={<SectionLoader />}><FeaturedCollections /></Suspense>
+          <Suspense fallback={<SectionLoader />}><PromoBanners /></Suspense>
+          <Suspense fallback={<SectionLoader />}><NewInTrend /></Suspense>
+          <Suspense fallback={<SectionLoader />}><StoriesSection /></Suspense>
+          <Suspense fallback={<SectionLoader />}><BackpackSeries /></Suspense>
+          <Suspense fallback={<SectionLoader />}><BagTheVibe /></Suspense>
+          <Suspense fallback={<SectionLoader />}><LuxeLeatherBags /></Suspense>
+          <Suspense fallback={<SectionLoader />}><ToteBackpack /></Suspense>
+          <Suspense fallback={<SectionLoader />}><OwnItLeadIt /></Suspense>
+          <Suspense fallback={<SectionLoader />}><TrustBar /></Suspense>
         </>
       )
     case 'shop':
-      return <ProductGrid />
+      return <Suspense fallback={<LoadingSpinner />}><ProductGrid /></Suspense>
     case 'product':
-      return <ProductDetail />
+      return <Suspense fallback={<LoadingSpinner />}><ProductDetail /></Suspense>
     case 'cart':
-      return <CartView />
+      return <Suspense fallback={<LoadingSpinner />}><CartView /></Suspense>
     case 'checkout':
-      return <CheckoutView />
+      return <Suspense fallback={<LoadingSpinner />}><CheckoutView /></Suspense>
     case 'confirmation':
-      return <OrderConfirmation />
+      return <Suspense fallback={<LoadingSpinner />}><OrderConfirmation /></Suspense>
     case 'admin':
-      return <AdminDashboard />
+      return <Suspense fallback={<LoadingSpinner />}><AdminDashboard /></Suspense>
     case 'login':
-      return <LoginForm />
+      return <Suspense fallback={<LoadingSpinner />}><LoginForm /></Suspense>
     case 'signup':
-      return <SignupForm />
+      return <Suspense fallback={<LoadingSpinner />}><SignupForm /></Suspense>
     default:
       return null
   }
@@ -97,17 +114,7 @@ export default function Home() {
       <AuthGuard>
         <Header />
         <main className="flex-1">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={view}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <ViewRenderer view={view} />
-            </motion.div>
-          </AnimatePresence>
+          <ViewRenderer view={view} />
         </main>
         <Footer />
       </AuthGuard>

@@ -55,15 +55,7 @@ import {
   Menu,
   X,
 } from 'lucide-react'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
+// Using simple CSS-based chart instead of recharts for performance
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1027,7 +1019,7 @@ export function AdminDashboard() {
           ))}
         </div>
 
-        {/* Revenue Chart */}
+        {/* Products by Category Chart */}
         <Card className="rounded-xl border-slate-200">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -1036,22 +1028,24 @@ export function AdminDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueByCategory}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                    }}
-                  />
-                  <Bar dataKey="products" fill="#b45309" radius={[4, 4, 0, 0]} name="Products" />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="space-y-3">
+              {revenueByCategory.map((cat) => {
+                const maxProducts = Math.max(...revenueByCategory.map(c => c.products), 1)
+                const widthPct = (cat.products / maxProducts) * 100
+                return (
+                  <div key={cat.name} className="flex items-center gap-3">
+                    <span className="text-sm text-slate-600 w-24 shrink-0 truncate">{cat.name}</span>
+                    <div className="flex-1 h-7 bg-slate-100 rounded-md overflow-hidden relative">
+                      <div
+                        className="h-full bg-amber-600 rounded-md transition-all duration-500 flex items-center justify-end pr-2"
+                        style={{ width: `${Math.max(widthPct, 8)}%` }}
+                      >
+                        <span className="text-xs font-medium text-white">{cat.products}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
