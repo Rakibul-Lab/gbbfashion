@@ -10,6 +10,8 @@ export interface CartItem {
   quantity: number
 }
 
+export type ProductTab = 'new' | 'prime'
+
 interface StoreState {
   view: ViewType
   selectedProductId: string | null
@@ -17,6 +19,7 @@ interface StoreState {
   orderId: string | null
   categoryFilter: string
   searchQuery: string
+  productTab: ProductTab
 
   setView: (view: ViewType) => void
   selectProduct: (productId: string | null) => void
@@ -27,6 +30,7 @@ interface StoreState {
   setOrderId: (orderId: string | null) => void
   setCategoryFilter: (category: string) => void
   setSearchQuery: (query: string) => void
+  setProductTab: (tab: ProductTab) => void
   cartTotal: () => number
   cartCount: () => number
 }
@@ -38,6 +42,7 @@ export const useStore = create<StoreState>((set, get) => ({
   orderId: null,
   categoryFilter: 'all',
   searchQuery: '',
+  productTab: 'new',
 
   setView: (view) => set({ view }),
   selectProduct: (productId) => set({ selectedProductId: productId }),
@@ -78,6 +83,7 @@ export const useStore = create<StoreState>((set, get) => ({
   setOrderId: (orderId) => set({ orderId }),
   setCategoryFilter: (category) => set({ categoryFilter: category }),
   setSearchQuery: (query) => set({ searchQuery: query }),
+  setProductTab: (tab) => set({ productTab: tab }),
 
   cartTotal: () => {
     return get().cart.reduce((sum, item) => sum + item.price * item.quantity, 0)

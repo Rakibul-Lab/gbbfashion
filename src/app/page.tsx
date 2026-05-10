@@ -5,8 +5,10 @@ import { useStore, ViewType } from '@/lib/store'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { HeroSection } from '@/components/hero-section'
-import { FeaturedProducts } from '@/components/featured-products'
-import { CategorySection } from '@/components/category-section'
+import { CategoryCards } from '@/components/category-cards'
+import { PopularProducts } from '@/components/popular-products'
+import { StoriesSection } from '@/components/stories-section'
+import { TrustBar } from '@/components/trust-bar'
 import { ProductGrid } from '@/components/product-grid'
 import { ProductDetail } from '@/components/product-detail'
 import { CartView } from '@/components/cart-view'
@@ -21,8 +23,10 @@ function ViewRenderer({ view }: { view: ViewType }) {
       return (
         <>
           <HeroSection />
-          <FeaturedProducts />
-          <CategorySection />
+          <CategoryCards />
+          <PopularProducts />
+          <StoriesSection />
+          <TrustBar />
         </>
       )
     case 'shop':

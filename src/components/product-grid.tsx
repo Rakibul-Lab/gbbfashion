@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { motion } from 'framer-motion'
 import { Star, ShoppingCart, Search, SlidersHorizontal } from 'lucide-react'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { categorySubCategories, subCategoryMap } from '@/lib/categories'
 
 interface Product {
   id: string
@@ -45,6 +46,7 @@ export function ProductGrid() {
   const { setView, selectProduct, addToCart, categoryFilter, setCategoryFilter, searchQuery, setSearchQuery } = useStore()
   const [products, setProducts] = useState<Product[]>([])
   const [sortBy, setSortBy] = useState<SortOption>('default')
+  const [subCategoryFilter, setSubCategoryFilter] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/products')
@@ -53,11 +55,30 @@ export function ProductGrid() {
       .catch(console.error)
   }, [])
 
+  // Wrap setCategoryFilter to also reset sub-category
+  const handleCategoryChange = useCallback((category: string) => {
+    setCategoryFilter(category)
+    setSubCategoryFilter(null)
+  }, [setCategoryFilter])
+
+  // Get sub-categories for the current main category
+  const currentSubCategories = useMemo(() => {
+    if (categoryFilter === 'all' || !categorySubCategories[categoryFilter]) {
+      return []
+    }
+    return categorySubCategories[categoryFilter]
+  }, [categoryFilter])
+
   const filteredProducts = useMemo(() => {
     let result = products
 
     if (categoryFilter !== 'all') {
       result = result.filter((p) => p.category === categoryFilter)
+    }
+
+    // Sub-category filter: match product name to subCategoryMap
+    if (subCategoryFilter) {
+      result = result.filter((p) => subCategoryMap[p.name] === subCategoryFilter)
     }
 
     if (searchQuery) {
@@ -85,7 +106,7 @@ export function ProductGrid() {
     }
 
     return result
-  }, [products, categoryFilter, searchQuery, sortBy])
+  }, [products, categoryFilter, subCategoryFilter, searchQuery, sortBy])
 
   return (
     <section className="py-8 sm:py-12 bg-white min-h-[60vh]">
@@ -97,7 +118,7 @@ export function ProductGrid() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
@@ -124,13 +145,13 @@ export function ProductGrid() {
         </div>
 
         {/* Category tabs */}
-        <div className="flex flex-wrap gap-2 mb-8">
+        <div className="flex flex-wrap gap-2 mb-4">
           {categoryTabs.map((tab) => (
             <Button
               key={tab.value}
               variant={categoryFilter === tab.value ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setCategoryFilter(tab.value)}
+              onClick={() => handleCategoryChange(tab.value)}
               className={`rounded-lg ${
                 categoryFilter === tab.value
                   ? 'bg-teal-600 hover:bg-teal-700 text-white'
@@ -142,6 +163,44 @@ export function ProductGrid() {
           ))}
         </div>
 
+        {/* Sub-category filters (shown when a main category is selected) */}
+        {currentSubCategories.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex flex-wrap gap-2 mb-6 pl-1"
+          >
+            <Button
+              variant={subCategoryFilter === null ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setSubCategoryFilter(null)}
+              className={`rounded-full text-xs h-8 ${
+                subCategoryFilter === null
+                  ? 'bg-slate-900 text-white hover:bg-slate-800'
+                  : 'text-slate-500 hover:text-teal-600'
+              }`}
+            >
+              All
+            </Button>
+            {currentSubCategories.map((sub) => (
+              <Button
+                key={sub.value}
+                variant={subCategoryFilter === sub.value ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setSubCategoryFilter(sub.value)}
+                className={`rounded-full text-xs h-8 ${
+                  subCategoryFilter === sub.value
+                    ? 'bg-slate-900 text-white hover:bg-slate-800'
+                    : 'text-slate-500 hover:text-teal-600'
+                }`}
+              >
+                {sub.label}
+              </Button>
+            ))}
+          </motion.div>
+        )}
+
         {/* Product grid */}
         {filteredProducts.length === 0 ? (
           <div className="text-center py-16">
@@ -150,7 +209,7 @@ export function ProductGrid() {
               variant="outline"
               className="mt-4"
               onClick={() => {
-                setCategoryFilter('all')
+                handleCategoryChange('all')
                 setSearchQuery('')
               }}
             >

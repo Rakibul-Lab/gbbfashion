@@ -33,7 +33,7 @@ const products = [
     features: '24/7 monitoring|IoT mesh support|Mobile alerts|Cloud analytics',
     rating: 4.6,
     inStock: true,
-    badge: null,
+    badge: 'New',
   },
   {
     name: 'RoboMaint Arm S5',
@@ -55,7 +55,7 @@ const products = [
     features: 'Deep learning models|Custom dashboards|Report generation|API access',
     rating: 4.7,
     inStock: true,
-    badge: null,
+    badge: 'Popular',
   },
   {
     name: 'AI Vision Inspector',
@@ -66,7 +66,7 @@ const products = [
     features: '4K visual inspection|Defect detection|OCR capability|Edge computing',
     rating: 4.5,
     inStock: true,
-    badge: null,
+    badge: 'New',
   },
   {
     name: 'PredictGuard Shield',
@@ -77,7 +77,7 @@ const products = [
     features: 'Failure prediction|Risk scoring|Safety compliance|Emergency protocols',
     rating: 4.8,
     inStock: true,
-    badge: 'Popular',
+    badge: 'Premium',
   },
   {
     name: 'SensorNet Mesh Pro',
@@ -99,7 +99,7 @@ const products = [
     features: 'Autonomous flight|Repair tools|Visual inspection|GPS precision',
     rating: 4.7,
     inStock: true,
-    badge: 'Innovative',
+    badge: 'Best Seller',
   },
   {
     name: 'DeepMetrics Engine',
@@ -110,7 +110,7 @@ const products = [
     features: 'Real-time processing|Anomaly detection|Trend analysis|ML pipelines',
     rating: 4.8,
     inStock: true,
-    badge: null,
+    badge: 'Premium',
   },
   {
     name: 'ThermalAI Scanner',
@@ -121,7 +121,7 @@ const products = [
     features: 'Thermal imaging|Heat mapping|AI anomaly detection|Reporting suite',
     rating: 4.5,
     inStock: true,
-    badge: null,
+    badge: 'Popular',
   },
   {
     name: 'MaintenanceOS Cloud',
