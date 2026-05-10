@@ -493,3 +493,131 @@ Stage Summary:
 - "CARRY CONFIDENCE" CTA button navigating to shop with category filter
 - Carousel with prev/next arrows, responsive layout
 - All lint checks pass
+
+---
+Task ID: 4
+Agent: Auth UI Agent
+Task: Create Login/Signup UI Components + Update Store
+
+Work Log:
+- Updated /src/lib/store.ts:
+  - Added 'login' and 'signup' to ViewType union
+  - Added UserInfo interface (id, name, email, role)
+  - Added user: UserInfo | null state field
+  - Added setUser action and isAuthenticated derived getter
+- Created /src/components/auth/login-form.tsx:
+  - GBB Fashion logo, "Welcome Back" heading
+  - Email + Password inputs with icons and show/hide toggle
+  - "Sign In" button with loading state
+  - Error display, "Sign Up" link, "Back to shopping" link
+  - On submit: POST /api/auth/login, store user in Zustand, navigate by role
+  - Framer-motion staggered entrance animations
+- Created /src/components/auth/signup-form.tsx:
+  - GBB Fashion logo, "Create Account" heading
+  - Name, Email, Phone (optional), Password, Confirm Password inputs
+  - Full validation (required, email format, password length, match)
+  - "Create Account" button with loading state
+  - On submit: POST /api/auth/signup, auto-login, navigate home
+  - Framer-motion staggered entrance animations
+- Created /src/components/auth-guard.tsx:
+  - Protected views (checkout, admin) redirect to login if unauthenticated
+  - Guest-only views (login, signup) redirect away if authenticated
+- Created API routes:
+  - /api/auth/signup/route.ts (registration with bcryptjs hashing)
+  - /api/auth/login/route.ts (credential verification with bcryptjs)
+  - /api/auth/session/route.ts (session check)
+- Updated /src/app/page.tsx:
+  - Added LoginForm, SignupForm, AuthGuard imports
+  - Added login/signup cases to ViewRenderer
+  - Wrapped app with AuthGuard
+- Updated /src/components/header.tsx:
+  - User icon navigates to login (unauthenticated) or account (authenticated)
+  - Mobile menu shows "Sign In" or "Account" based on auth state
+- Installed bcryptjs and @types/bcryptjs
+- ESLint: No errors
+- All API endpoints tested and working
+
+Stage Summary:
+- Complete auth UI system with login and signup forms
+- Zustand store extended with user state and isAuthenticated getter
+- AuthGuard protects checkout/admin, redirects from login/signup when authenticated
+- Header links to login view for unauthenticated users
+- API routes for signup and login with bcryptjs password hashing
+- Seeded users available: admin@gbb.com/admin123, customer@test.com/test123
+
+---
+Task ID: 2-3
+Agent: Auth & API Agent
+Task: Set up NextAuth.js v4 + Create all API routes
+
+Work Log:
+- Installed bcryptjs@3.0.3 and @types/bcryptjs@3.0.0
+- Created /src/lib/auth.ts: NextAuth v4 configuration with CredentialsProvider, JWT strategy, custom callbacks (id, role on session), custom signIn page
+- Created /src/app/api/auth/[...nextauth]/route.ts: NextAuth route handler (GET + POST)
+- Created /src/components/auth-provider.tsx: Client component wrapping children with NextAuth SessionProvider
+- Created /src/types/next-auth.d.ts: TypeScript type augmentations for Session (id, name, email, role) and JWT (id, role)
+- Updated /src/app/api/auth/signup/route.ts: Added admin role assignment for admin@gbb.com email
+- Updated /src/app/api/auth/session/route.ts: Replaced stub with getServerSession(authOptions) from NextAuth
+- Created /src/app/api/reels/route.ts: GET (list with ?active=true filter) + POST (create with validation)
+- Created /src/app/api/reels/[id]/route.ts: GET (single) + PUT (update) + DELETE (remove) with 404 handling
+- Created /src/app/api/users/route.ts: GET all users (password excluded, ordered by createdAt desc)
+- Updated /src/app/api/seed/route.ts: Added user seeding (admin@gbb.com/admin123 + customer@test.com/test123), reel seeding (5 reels matching video files), product data enriched with originalPrice, colors, collection, hasFlash
+- Updated /src/app/layout.tsx: Wrapped children with AuthProvider for NextAuth session support
+- ESLint: No errors
+- All API endpoints tested and working
+
+Stage Summary:
+- Complete NextAuth v4 integration with credentials provider, JWT strategy, and custom session callbacks
+- 7 API routes created/updated: auth/signup, auth/login, auth/session, auth/[...nextauth], reels, reels/[id], users
+- Seed API seeds 22 products (with originalPrice, colors, collection, hasFlash), 5 reels, and 2 users
+- AuthProvider wraps the app for client-side session access
+- TypeScript type declarations for NextAuth session and JWT with custom fields
+
+---
+Task ID: 6
+Agent: Checkout Protection Agent
+Task: Add Checkout Protection (Require Login to Place Order)
+
+Work Log:
+- Read worklog.md to understand previous agent work (auth system already in place from Tasks 4 and 2-3)
+- Read current checkout-view.tsx, cart-view.tsx, page.tsx, store.ts, and auth-guard.tsx
+
+### checkout-view.tsx updates:
+- Added `LogIn` and `UserPlus` icon imports from lucide-react
+- Added `useEffect` import from react
+- Added `user` to the destructured useStore() values
+- Added `errors` useState moved before the early return (React hooks rules compliance)
+- Added `useEffect` to pre-fill `customerName` and `customerEmail` from user info when logged in
+- Added early return with sign-in prompt when user is not logged in:
+  - Centered layout with LogIn icon, "Please sign in to place your order" heading
+  - "You need an account to complete your purchase" description
+  - "Sign In" button (navigates to login view) with solid dark style
+  - "Create Account" button (navigates to signup view) with outline style
+  - Framer-motion entrance animation
+
+### cart-view.tsx updates:
+- Added `LogIn` icon import from lucide-react
+- Added `user` to the destructured useStore() values
+- Added soft sign-in reminder before the "Proceed to Checkout" button:
+  - Amber-colored info box with LogIn icon
+  - "Sign in to checkout" text with clickable "Sign in" link that navigates to login view
+  - Only shows when user is not logged in (soft reminder, not a hard block)
+  - Checkout button remains functional regardless of auth state
+
+### page.tsx updates:
+- Added `useStore` import usage inside ViewRenderer component (already imported at top)
+- Added admin role protection in ViewRenderer before the switch statement:
+  - If view is 'admin' and user is not authenticated → redirect to login view
+  - If view is 'admin' and user is authenticated but not admin role → redirect to home view
+  - Defense-in-depth approach alongside existing AuthGuard
+
+### Quality Checks:
+- ESLint: No errors
+- Dev server: Compiles successfully
+
+Stage Summary:
+- Checkout view now requires authentication with clear sign-in prompt and pre-fills user info
+- Cart view has soft "Sign in to checkout" reminder for unauthenticated users
+- Admin view protected at ViewRenderer level with role-based access control
+- All hooks properly ordered (no conditional hook violations)
+- All existing functionality preserved

@@ -34,12 +34,17 @@ export async function PUT(
         name: body.name,
         description: body.description,
         price: body.price,
+        originalPrice: body.originalPrice ?? null,
         category: body.category,
         image: body.image,
+        secondaryImage: body.secondaryImage ?? null,
         features: body.features,
         rating: body.rating,
         inStock: body.inStock,
-        badge: body.badge,
+        badge: body.badge ?? null,
+        colors: body.colors ?? null,
+        collection: body.collection ?? null,
+        hasFlash: body.hasFlash ?? false,
       },
     })
 

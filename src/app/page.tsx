@@ -21,9 +21,26 @@ import { CartView } from '@/components/cart-view'
 import { CheckoutView } from '@/components/checkout-view'
 import { OrderConfirmation } from '@/components/order-confirmation'
 import { AdminDashboard } from '@/components/admin-dashboard'
+import { LoginForm } from '@/components/auth/login-form'
+import { SignupForm } from '@/components/auth/signup-form'
+import { AuthGuard } from '@/components/auth-guard'
 import { motion, AnimatePresence } from 'framer-motion'
 
 function ViewRenderer({ view }: { view: ViewType }) {
+  const { user, setView } = useStore()
+
+  // Protect admin view: require authentication and admin role
+  if (view === 'admin') {
+    if (!user) {
+      setView('login')
+      return null
+    }
+    if (user.role !== 'admin') {
+      setView('home')
+      return null
+    }
+  }
+
   switch (view) {
     case 'home':
       return (
@@ -53,6 +70,10 @@ function ViewRenderer({ view }: { view: ViewType }) {
       return <OrderConfirmation />
     case 'admin':
       return <AdminDashboard />
+    case 'login':
+      return <LoginForm />
+    case 'signup':
+      return <SignupForm />
     default:
       return null
   }
@@ -73,21 +94,23 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <Header />
-      <main className="flex-1">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={view}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
-            <ViewRenderer view={view} />
-          </motion.div>
-        </AnimatePresence>
-      </main>
-      <Footer />
+      <AuthGuard>
+        <Header />
+        <main className="flex-1">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={view}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ViewRenderer view={view} />
+            </motion.div>
+          </AnimatePresence>
+        </main>
+        <Footer />
+      </AuthGuard>
     </div>
   )
 }

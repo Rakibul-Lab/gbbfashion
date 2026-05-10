@@ -259,10 +259,22 @@ export function Header() {
                       </button>
                       <button
                         className="w-full text-left px-5 py-3.5 text-[13px] font-medium text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-3"
-                        onClick={() => { setView('admin'); setMobileOpen(false) }}
+                        onClick={() => {
+                          const currentUser = useStore.getState().user
+                          if (currentUser) {
+                            if (currentUser.role === 'admin') {
+                              setView('admin')
+                            } else {
+                              setView('home')
+                            }
+                          } else {
+                            setView('login')
+                          }
+                          setMobileOpen(false)
+                        }}
                       >
                         <User className="h-4 w-4" />
-                        Account
+                        {useStore.getState().user ? 'Account' : 'Sign In'}
                       </button>
                     </nav>
                   </div>
@@ -364,6 +376,18 @@ export function Header() {
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={() => {
+                  const currentUser = useStore.getState().user
+                  if (currentUser) {
+                    if (currentUser.role === 'admin') {
+                      setView('admin')
+                    } else {
+                      setView('home')
+                    }
+                  } else {
+                    setView('login')
+                  }
+                }}
                 className="hidden sm:flex text-slate-600 hover:text-slate-900 hover:bg-slate-50 h-10 w-10"
               >
                 <User className="h-[18px] w-[18px]" />

@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { motion } from 'framer-motion'
-import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft } from 'lucide-react'
+import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, LogIn } from 'lucide-react'
 
 export function CartView() {
-  const { cart, updateQuantity, removeFromCart, cartTotal, setView } = useStore()
+  const { cart, updateQuantity, removeFromCart, cartTotal, setView, user } = useStore()
 
   const subtotal = cartTotal()
   const shipping = subtotal > 99 ? 0 : 9.99
@@ -145,6 +145,21 @@ export function CartView() {
                     <span className="text-xl font-bold text-amber-700">${total.toLocaleString()}</span>
                   </div>
                 </div>
+                {!user && (
+                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2 text-sm text-amber-800">
+                    <LogIn className="h-4 w-4 shrink-0" />
+                    <span>
+                      <button
+                        type="button"
+                        onClick={() => setView('login')}
+                        className="font-semibold underline underline-offset-2 hover:text-amber-900"
+                      >
+                        Sign in
+                      </button>
+                      {' '}to checkout
+                    </span>
+                  </div>
+                )}
                 <Button
                   size="lg"
                   className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-lg shadow-slate-500/25"

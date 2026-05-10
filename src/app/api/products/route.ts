@@ -40,12 +40,17 @@ export async function POST(request: NextRequest) {
         name: body.name,
         description: body.description,
         price: body.price,
+        originalPrice: body.originalPrice ?? null,
         category: body.category,
         image: body.image,
+        secondaryImage: body.secondaryImage ?? null,
         features: body.features,
         rating: body.rating ?? 4.5,
         inStock: body.inStock ?? true,
         badge: body.badge ?? null,
+        colors: body.colors ?? null,
+        collection: body.collection ?? null,
+        hasFlash: body.hasFlash ?? false,
       },
     })
     return NextResponse.json(product, { status: 201 })

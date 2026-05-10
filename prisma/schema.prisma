@@ -7,24 +7,42 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String
+  role          String   @default("customer")
+  phone         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  orders        Order[]
+}
+
 model Product {
-  id          String   @id @default(cuid())
-  name        String
-  description String
-  price       Float
-  category    String
-  image       String
-  features    String
-  rating      Float    @default(4.5)
-  inStock     Boolean  @default(true)
-  badge       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  orderItems  OrderItem[]
+  id            String   @id @default(cuid())
+  name          String
+  description   String
+  price         Float
+  originalPrice Float?
+  category      String
+  image         String
+  secondaryImage String?
+  features      String
+  rating        Float    @default(4.5)
+  inStock       Boolean  @default(true)
+  badge         String?
+  colors        String?
+  collection    String?
+  hasFlash      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  orderItems    OrderItem[]
 }
 
 model Order {
   id              String      @id @default(cuid())
+  userId          String?
   customerName    String
   customerEmail   String
   customerPhone   String
@@ -35,6 +53,7 @@ model Order {
   totalAmount     Float
   status          String      @default("pending")
   items           OrderItem[]
+  user            User?       @relation(fields: [userId], references: [id])
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 }
@@ -48,4 +67,20 @@ model OrderItem {
   price       Float
   order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product     Product @relation(fields: [productId], references: [id])
+}
+
+model Reel {
+  id              String   @id @default(cuid())
+  title           String
+  productName     String
+  price           Float
+  originalPrice   Float?
+  videoSrc        String
+  videoThumbnail  String
+  thumbnail       String
+  colors          String?
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

@@ -7,12 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowLeft, Loader2, LogIn, UserPlus } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 
 export function CheckoutView() {
-  const { cart, cartTotal, setView, setOrderId, clearCart } = useStore()
+  const { cart, cartTotal, setView, setOrderId, clearCart, user } = useStore()
   const [loading, setLoading] = useState(false)
 
   const subtotal = cartTotal()
@@ -30,6 +30,53 @@ export function CheckoutView() {
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Pre-fill form from user info when logged in
+  useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        ...prev,
+        customerName: prev.customerName || user.name,
+        customerEmail: prev.customerEmail || user.email,
+      }))
+    }
+  }, [user])
+
+  // If not logged in, show sign-in prompt
+  if (!user) {
+    return (
+      <section className="py-16 sm:py-24 bg-slate-50 min-h-[60vh] flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center max-w-md mx-auto px-4"
+        >
+          <div className="mx-auto w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-6">
+            <LogIn className="h-9 w-9 text-slate-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Please sign in to place your order</h2>
+          <p className="text-slate-500 mb-8">You need an account to complete your purchase. Sign in or create one to continue.</p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button
+              onClick={() => setView('login')}
+              className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl"
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              Sign In
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setView('signup')}
+              className="border-slate-300 hover:border-slate-400 rounded-xl"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Create Account
+            </Button>
+          </div>
+        </motion.div>
+      </section>
+    )
+  }
 
   const validate = () => {
     const errs: Record<string, string> = {}

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type ViewType = 'home' | 'shop' | 'product' | 'cart' | 'checkout' | 'confirmation' | 'admin'
+export type ViewType = 'home' | 'shop' | 'product' | 'cart' | 'checkout' | 'confirmation' | 'admin' | 'login' | 'signup'
 
 export interface CartItem {
   productId: string
@@ -12,6 +12,13 @@ export interface CartItem {
 
 export type ProductTab = 'new' | 'prime'
 
+export interface UserInfo {
+  id: string
+  name: string
+  email: string
+  role: string
+}
+
 interface StoreState {
   view: ViewType
   selectedProductId: string | null
@@ -20,6 +27,7 @@ interface StoreState {
   categoryFilter: string
   searchQuery: string
   productTab: ProductTab
+  user: UserInfo | null
 
   setView: (view: ViewType) => void
   selectProduct: (productId: string | null) => void
@@ -31,6 +39,8 @@ interface StoreState {
   setCategoryFilter: (category: string) => void
   setSearchQuery: (query: string) => void
   setProductTab: (tab: ProductTab) => void
+  setUser: (user: UserInfo | null) => void
+  isAuthenticated: () => boolean
   cartTotal: () => number
   cartCount: () => number
 }
@@ -43,6 +53,7 @@ export const useStore = create<StoreState>((set, get) => ({
   categoryFilter: 'all',
   searchQuery: '',
   productTab: 'new',
+  user: null,
 
   setView: (view) => set({ view }),
   selectProduct: (productId) => set({ selectedProductId: productId }),
@@ -84,6 +95,9 @@ export const useStore = create<StoreState>((set, get) => ({
   setCategoryFilter: (category) => set({ categoryFilter: category }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setProductTab: (tab) => set({ productTab: tab }),
+  setUser: (user) => set({ user }),
+
+  isAuthenticated: () => !!get().user,
 
   cartTotal: () => {
     return get().cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
