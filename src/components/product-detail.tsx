@@ -28,8 +28,6 @@ const badgeColors: Record<string, string> = {
   'New': 'bg-teal-100 text-teal-700 border-teal-200',
   'Premium': 'bg-amber-100 text-amber-700 border-amber-200',
   'Popular': 'bg-rose-100 text-rose-700 border-rose-200',
-  'Innovative': 'bg-violet-100 text-violet-700 border-violet-200',
-  'SaaS': 'bg-cyan-100 text-cyan-700 border-cyan-200',
 }
 
 export function ProductDetail() {
@@ -58,7 +56,7 @@ export function ProductDetail() {
   if (!product) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-teal-200 border-t-teal-600 rounded-full" />
+        <div className="animate-spin h-8 w-8 border-4 border-amber-200 border-t-amber-600 rounded-full" />
       </div>
     )
   }
@@ -97,7 +95,7 @@ export function ProductDetail() {
           variant="ghost"
           size="sm"
           onClick={() => setView('shop')}
-          className="mb-6 text-slate-500 hover:text-teal-600"
+          className="mb-6 text-slate-500 hover:text-amber-700"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back to Shop
@@ -135,7 +133,7 @@ export function ProductDetail() {
             className="flex flex-col"
           >
             <div className="mb-2">
-              <span className="text-sm font-medium text-teal-600 uppercase tracking-wider">
+              <span className="text-sm font-medium text-amber-700 uppercase tracking-wider">
                 {product.category}
               </span>
             </div>
@@ -167,7 +165,7 @@ export function ProductDetail() {
 
             {/* Price */}
             <div className="mt-4">
-              <span className="text-3xl font-bold text-teal-600">
+              <span className="text-3xl font-bold text-amber-700">
                 ${product.price.toLocaleString()}
               </span>
             </div>
@@ -185,7 +183,7 @@ export function ProductDetail() {
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {features.map((feature, i) => (
                   <li key={i} className="flex items-center gap-2 text-sm text-slate-600">
-                    <Check className="h-4 w-4 text-teal-500 shrink-0" />
+                    <Check className="h-4 w-4 text-amber-600 shrink-0" />
                     {feature.trim()}
                   </li>
                 ))}
@@ -219,7 +217,7 @@ export function ProductDetail() {
                 size="lg"
                 onClick={handleAddToCart}
                 disabled={!product.inStock}
-                className="flex-1 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-xl shadow-lg shadow-teal-500/25"
+                className="flex-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-lg shadow-slate-500/25"
               >
                 <ShoppingCart className="h-5 w-5 mr-2" />
                 Add to Cart — ${(product.price * quantity).toLocaleString()}
@@ -248,7 +246,7 @@ export function ProductDetail() {
                   </div>
                   <CardContent className="p-3">
                     <h3 className="font-medium text-sm text-slate-900 line-clamp-1">{p.name}</h3>
-                    <p className="text-sm font-bold text-teal-600 mt-1">${p.price.toLocaleString()}</p>
+                    <p className="text-sm font-bold text-amber-700 mt-1">${p.price.toLocaleString()}</p>
                   </CardContent>
                 </Card>
               ))}

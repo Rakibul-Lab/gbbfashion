@@ -1,42 +1,50 @@
 // Shared constants for categories and sub-categories
-// This file can be imported by both client and server code
+// Fashion e-commerce categories matching gbbfashion.com style
 
 export const subCategoryMap: Record<string, string> = {
-  'AI Diagnostic Scanner Pro': 'handheld-scanners',
-  'AI Vision Inspector': 'vision-systems',
-  'ThermalAI Scanner': 'thermal-imaging',
-  'PredictFlow Engine': 'prediction-engines',
-  'PredictGuard Shield': 'safety-systems',
-  'SmartSensor Hub X1': 'sensor-hubs',
-  'SensorNet Mesh Pro': 'mesh-networks',
-  'RoboMaint Arm S5': 'robotic-arms',
-  'AutoFix Drone V2': 'maintenance-drones',
-  'Neural Analytics Platform': 'analytics-platforms',
-  'DeepMetrics Engine': 'analytics-platforms',
-  'MaintenanceOS Cloud': 'cloud-solutions',
+  'GBB Exclusive Cow Leather Tote Handbag': 'tote-bag',
+  'Elegant Crossbody Bag with Gold Chain': 'cross-body-bag',
+  'Luxury Shoulder Bag - Burgundy': 'shoulder-bag',
+  'Mini Bag - Rose Pink Edition': 'mini-bag',
+  'Premium Leather Hand Bag - Cream': 'hand-bag',
+  'Classic Red Leather Handbag': 'hand-bag',
+  'Premium Leather Backpack - Dark Brown': 'bag-pack',
+  'Leather Messenger Bag - Cognac': 'bag-pack',
+  'Long Wallet - Black Premium': 'long-wallet',
+  "Kids' Mini Backpack - Pastel": 'kids-bag',
+  'Oxford Dress Shoes - Dark Brown': 'man-shoes',
+  'High Heel Pumps - Nude Beige': 'women-shoes',
+  'Classic Leather Belt - Black': 'male-belt',
+  'Elegant Women\'s Belt - Tan': 'female-belt',
+  'Leather Key Holder - Brown': 'key-holder',
 }
 
 export const categorySubCategories: Record<string, { value: string; label: string }[]> = {
-  diagnostics: [
-    { value: 'handheld-scanners', label: 'Handheld Scanners' },
-    { value: 'vision-systems', label: 'Vision Systems' },
-    { value: 'thermal-imaging', label: 'Thermal Imaging' },
+  women: [
+    { value: 'hand-bag', label: 'Hand Bag' },
+    { value: 'cross-body-bag', label: 'Cross Body Bag' },
+    { value: 'shoulder-bag', label: 'Shoulder Bag' },
+    { value: 'tote-bag', label: 'Tote Bag' },
+    { value: 'mini-bag', label: 'Mini Bag' },
+    { value: 'bag-pack', label: 'Bag Pack' },
   ],
-  predictive: [
-    { value: 'prediction-engines', label: 'Prediction Engines' },
-    { value: 'safety-systems', label: 'Safety Systems' },
+  men: [
+    { value: 'bag-pack', label: 'Bag Pack Bag' },
+    { value: 'long-wallet', label: 'Money Bag / Long Wallet' },
   ],
-  monitoring: [
-    { value: 'sensor-hubs', label: 'Sensor Hubs' },
-    { value: 'mesh-networks', label: 'Mesh Networks' },
+  shoes: [
+    { value: 'man-shoes', label: 'Man Shoes' },
+    { value: 'women-shoes', label: 'Women Shoes' },
   ],
-  robotic: [
-    { value: 'robotic-arms', label: 'Robotic Arms' },
-    { value: 'maintenance-drones', label: 'Maintenance Drones' },
+  belt: [
+    { value: 'male-belt', label: 'Male' },
+    { value: 'female-belt', label: 'Female' },
   ],
-  analytics: [
-    { value: 'analytics-platforms', label: 'Analytics Platforms' },
-    { value: 'cloud-solutions', label: 'Cloud Solutions' },
+  kids: [
+    { value: 'kids-bag', label: 'Kids Bags' },
+  ],
+  accessories: [
+    { value: 'key-holder', label: 'Key Holder (Leather)' },
   ],
 }
 

@@ -16,7 +16,7 @@ export function CheckoutView() {
   const [loading, setLoading] = useState(false)
 
   const subtotal = cartTotal()
-  const shipping = subtotal > 5000 ? 0 : 49.99
+  const shipping = subtotal > 99 ? 0 : 9.99
   const total = subtotal + shipping
 
   const [form, setForm] = useState({
@@ -102,7 +102,7 @@ export function CheckoutView() {
           variant="ghost"
           size="sm"
           onClick={() => setView('cart')}
-          className="mb-6 text-slate-500 hover:text-teal-600"
+          className="mb-6 text-slate-500 hover:text-amber-700"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back to Cart
@@ -254,12 +254,12 @@ export function CheckoutView() {
                   <Separator />
                   <div className="flex justify-between">
                     <span className="font-semibold text-slate-900">Total</span>
-                    <span className="text-xl font-bold text-teal-600">${total.toLocaleString()}</span>
+                    <span className="text-xl font-bold text-amber-700">${total.toLocaleString()}</span>
                   </div>
                 </div>
                 <Button
                   size="lg"
-                  className="w-full mt-6 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-xl shadow-lg shadow-teal-500/25"
+                  className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-lg shadow-slate-500/25"
                   onClick={handleSubmit}
                   disabled={loading || cart.length === 0}
                 >

@@ -7,22 +7,22 @@ const features = [
   {
     icon: Truck,
     title: 'Nationwide Shipping',
-    description: 'We ship across the country. Orders processed within 1-2 business days.',
+    description: 'Free shipping on orders over $99. Delivered to your doorstep within 3-5 business days.',
   },
   {
     icon: ShieldCheck,
     title: 'Money Back Guarantee',
-    description: 'Not satisfied? Contact us within 7 days for a full refund.',
+    description: 'Not satisfied? Return within 7 days for a full refund. No questions asked.',
   },
   {
     icon: Tag,
     title: 'Exclusive Offers',
-    description: 'Save big with our deals and limited-time discounts on AI solutions.',
+    description: 'Save big with seasonal deals and limited-time discounts on premium collections.',
   },
   {
     icon: Headphones,
-    title: '24/7 Expert Support',
-    description: 'Our team is here for you anytime, day or night.',
+    title: 'Customer Support',
+    description: 'Our dedicated team is here to help you with any questions or concerns.',
   },
 ]
 
@@ -40,11 +40,11 @@ export function TrustBar() {
               transition={{ delay: index * 0.1, duration: 0.4 }}
               className="flex flex-col items-center text-center"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 text-teal-600 mb-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-700 mb-3">
                 <feature.icon className="h-5 w-5" />
               </div>
               <h3 className="text-sm font-semibold text-slate-900 mb-1">{feature.title}</h3>
-              <p className="text-xs text-slate-500 leading-relaxed max-w-[200px]">{feature.description}</p>
+              <p className="text-xs text-slate-500 leading-relaxed max-w-[220px]">{feature.description}</p>
             </motion.div>
           ))}
         </div>

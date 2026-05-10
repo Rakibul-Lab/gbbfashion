@@ -27,17 +27,16 @@ const badgeColors: Record<string, string> = {
   'New': 'bg-teal-100 text-teal-700 border-teal-200',
   'Premium': 'bg-amber-100 text-amber-700 border-amber-200',
   'Popular': 'bg-rose-100 text-rose-700 border-rose-200',
-  'Innovative': 'bg-violet-100 text-violet-700 border-violet-200',
-  'SaaS': 'bg-cyan-100 text-cyan-700 border-cyan-200',
 }
 
 const categoryTabs = [
   { value: 'all', label: 'All' },
-  { value: 'diagnostics', label: 'Diagnostics' },
-  { value: 'predictive', label: 'Predictive' },
-  { value: 'monitoring', label: 'Monitoring' },
-  { value: 'robotic', label: 'Robotic' },
-  { value: 'analytics', label: 'Analytics' },
+  { value: 'women', label: "Women's Bags" },
+  { value: 'men', label: "Men's Bags" },
+  { value: 'shoes', label: 'Shoes' },
+  { value: 'belt', label: 'Belt' },
+  { value: 'kids', label: 'Kids' },
+  { value: 'accessories', label: 'Accessories' },
 ]
 
 type SortOption = 'default' | 'price-asc' | 'price-desc' | 'rating' | 'name'
@@ -55,13 +54,11 @@ export function ProductGrid() {
       .catch(console.error)
   }, [])
 
-  // Wrap setCategoryFilter to also reset sub-category
   const handleCategoryChange = useCallback((category: string) => {
     setCategoryFilter(category)
     setSubCategoryFilter(null)
   }, [setCategoryFilter])
 
-  // Get sub-categories for the current main category
   const currentSubCategories = useMemo(() => {
     if (categoryFilter === 'all' || !categorySubCategories[categoryFilter]) {
       return []
@@ -76,7 +73,6 @@ export function ProductGrid() {
       result = result.filter((p) => p.category === categoryFilter)
     }
 
-    // Sub-category filter: match product name to subCategoryMap
     if (subCategoryFilter) {
       result = result.filter((p) => subCategoryMap[p.name] === subCategoryFilter)
     }
@@ -113,7 +109,7 @@ export function ProductGrid() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Product Catalog</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Shop Collection</h1>
           <p className="mt-1 text-slate-500">{filteredProducts.length} products available</p>
         </div>
 
@@ -122,7 +118,7 @@ export function ProductGrid() {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Search products..."
+              placeholder="Search bags, shoes, accessories..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 rounded-lg border-slate-200"
@@ -154,8 +150,8 @@ export function ProductGrid() {
               onClick={() => handleCategoryChange(tab.value)}
               className={`rounded-lg ${
                 categoryFilter === tab.value
-                  ? 'bg-teal-600 hover:bg-teal-700 text-white'
-                  : 'border-slate-200 text-slate-600 hover:text-teal-600 hover:border-teal-200'
+                  ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                  : 'border-slate-200 text-slate-600 hover:text-amber-700 hover:border-amber-200'
               }`}
             >
               {tab.label}
@@ -163,7 +159,7 @@ export function ProductGrid() {
           ))}
         </div>
 
-        {/* Sub-category filters (shown when a main category is selected) */}
+        {/* Sub-category filters */}
         {currentSubCategories.length > 0 && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
@@ -177,8 +173,8 @@ export function ProductGrid() {
               onClick={() => setSubCategoryFilter(null)}
               className={`rounded-full text-xs h-8 ${
                 subCategoryFilter === null
-                  ? 'bg-slate-900 text-white hover:bg-slate-800'
-                  : 'text-slate-500 hover:text-teal-600'
+                  ? 'bg-amber-600 text-white hover:bg-amber-700'
+                  : 'text-slate-500 hover:text-amber-700'
               }`}
             >
               All
@@ -191,8 +187,8 @@ export function ProductGrid() {
                 onClick={() => setSubCategoryFilter(sub.value)}
                 className={`rounded-full text-xs h-8 ${
                   subCategoryFilter === sub.value
-                    ? 'bg-slate-900 text-white hover:bg-slate-800'
-                    : 'text-slate-500 hover:text-teal-600'
+                    ? 'bg-amber-600 text-white hover:bg-amber-700'
+                    : 'text-slate-500 hover:text-amber-700'
                 }`}
               >
                 {sub.label}
@@ -226,7 +222,7 @@ export function ProductGrid() {
                 transition={{ delay: index * 0.05 }}
                 layout
               >
-                <Card className="group overflow-hidden rounded-xl border-slate-200 hover:shadow-xl hover:shadow-teal-500/5 transition-all duration-300 cursor-pointer h-full flex flex-col">
+                <Card className="group overflow-hidden rounded-xl border-slate-200 hover:shadow-xl hover:shadow-amber-500/5 transition-all duration-300 cursor-pointer h-full flex flex-col">
                   <div
                     className="relative aspect-square overflow-hidden bg-slate-100"
                     onClick={() => {
@@ -249,7 +245,7 @@ export function ProductGrid() {
                   </div>
                   <CardContent className="p-4 flex flex-col flex-1">
                     <h3
-                      className="font-semibold text-slate-900 line-clamp-1 cursor-pointer hover:text-teal-600 transition-colors"
+                      className="font-semibold text-slate-900 line-clamp-1 cursor-pointer hover:text-amber-700 transition-colors"
                       onClick={() => {
                         selectProduct(product.id)
                         setView('product')
@@ -263,7 +259,7 @@ export function ProductGrid() {
                       <span className="text-sm font-medium text-slate-700">{product.rating}</span>
                     </div>
                     <div className="flex items-center justify-between mt-auto pt-3">
-                      <span className="text-lg font-bold text-teal-600">
+                      <span className="text-lg font-bold text-amber-700">
                         ${product.price.toLocaleString()}
                       </span>
                       <Button
@@ -276,7 +272,7 @@ export function ProductGrid() {
                             image: product.image,
                           })
                         }
-                        className="bg-teal-600 hover:bg-teal-700 text-white rounded-lg"
+                        className="bg-slate-900 hover:bg-slate-800 text-white rounded-lg"
                       >
                         <ShoppingCart className="h-4 w-4" />
                       </Button>

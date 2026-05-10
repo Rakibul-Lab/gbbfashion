@@ -22,17 +22,14 @@ const badgeColors: Record<string, string> = {
   'New': 'bg-teal-100 text-teal-700 border-teal-200',
   'Premium': 'bg-amber-100 text-amber-700 border-amber-200',
   'Popular': 'bg-rose-100 text-rose-700 border-rose-200',
-  'Innovative': 'bg-violet-100 text-violet-700 border-violet-200',
-  'SaaS': 'bg-cyan-100 text-cyan-700 border-cyan-200',
 }
 
-// Pick 5 specific featured products for stories
 const featuredProductNames = [
-  'AI Diagnostic Scanner Pro',
-  'RoboMaint Arm S5',
-  'PredictFlow Engine',
-  'AutoFix Drone V2',
-  'Neural Analytics Platform',
+  'GBB Exclusive Cow Leather Tote Handbag',
+  'Premium Leather Backpack - Dark Brown',
+  'Elegant Crossbody Bag with Gold Chain',
+  'Oxford Dress Shoes - Dark Brown',
+  'Luxury Shoulder Bag - Burgundy',
 ]
 
 export function StoriesSection() {
@@ -44,7 +41,6 @@ export function StoriesSection() {
     fetch('/api/products')
       .then((res) => res.json())
       .then((data) => {
-        // Pick featured products in a specific order
         const featured = featuredProductNames
           .map((name) => data.find((p: Product) => p.name === name))
           .filter(Boolean) as Product[]
@@ -59,7 +55,7 @@ export function StoriesSection() {
       <section className="py-12 sm:py-16 bg-slate-50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin h-6 w-6 border-2 border-teal-200 border-t-teal-600 rounded-full" />
+            <div className="animate-spin h-6 w-6 border-2 border-amber-200 border-t-amber-600 rounded-full" />
           </div>
         </div>
       </section>
@@ -71,8 +67,8 @@ export function StoriesSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="mb-8">
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">Innovation Stories</h2>
-          <p className="mt-2 text-slate-500 text-sm">Discover the cutting-edge solutions redefining industrial maintenance.</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900" style={{ fontFamily: 'Jost, sans-serif' }}>Featured Picks</h2>
+          <p className="mt-2 text-slate-500 text-sm">Handpicked selections from our latest collection.</p>
         </div>
 
         {/* Stories Grid */}
@@ -86,8 +82,7 @@ export function StoriesSection() {
               transition={{ delay: index * 0.08, duration: 0.4 }}
               className="group"
             >
-              <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300">
-                {/* Product Image */}
+              <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-300">
                 <div
                   className="relative aspect-[3/4] overflow-hidden bg-slate-100 cursor-pointer"
                   onClick={() => {
@@ -109,10 +104,9 @@ export function StoriesSection() {
                   )}
                 </div>
 
-                {/* Product Info & Add to Cart */}
                 <div className="p-3">
                   <h3
-                    className="font-medium text-xs sm:text-sm text-slate-900 line-clamp-1 cursor-pointer hover:text-teal-600 transition-colors"
+                    className="font-medium text-xs sm:text-sm text-slate-900 line-clamp-1 cursor-pointer hover:text-amber-700 transition-colors"
                     onClick={() => {
                       selectProduct(product.id)
                       setView('product')
@@ -120,7 +114,7 @@ export function StoriesSection() {
                   >
                     {product.name}
                   </h3>
-                  <p className="text-sm font-bold text-teal-600 mt-1">
+                  <p className="text-sm font-bold text-amber-700 mt-1">
                     ${product.price.toLocaleString()}
                   </p>
                   <Button
@@ -133,7 +127,7 @@ export function StoriesSection() {
                         image: product.image,
                       })
                     }
-                    className="w-full mt-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg h-8 text-xs"
+                    className="w-full mt-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg h-8 text-xs"
                   >
                     <ShoppingCart className="h-3.5 w-3.5 mr-1" />
                     Add to Cart

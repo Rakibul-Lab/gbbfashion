@@ -12,7 +12,7 @@ export function CartView() {
   const { cart, updateQuantity, removeFromCart, cartTotal, setView } = useStore()
 
   const subtotal = cartTotal()
-  const shipping = subtotal > 5000 ? 0 : 49.99
+  const shipping = subtotal > 99 ? 0 : 9.99
   const total = subtotal + shipping
 
   if (cart.length === 0) {
@@ -30,7 +30,7 @@ export function CartView() {
           <p className="text-slate-500 mb-6">Add some products to get started!</p>
           <Button
             onClick={() => setView('shop')}
-            className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl"
+            className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl"
           >
             Browse Products
           </Button>
@@ -46,7 +46,7 @@ export function CartView() {
           variant="ghost"
           size="sm"
           onClick={() => setView('shop')}
-          className="mb-6 text-slate-500 hover:text-teal-600"
+          className="mb-6 text-slate-500 hover:text-amber-700"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
           Continue Shopping
@@ -78,7 +78,7 @@ export function CartView() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-slate-900 line-clamp-1">{item.name}</h3>
-                        <p className="text-lg font-bold text-teal-600 mt-1">
+                        <p className="text-lg font-bold text-amber-700 mt-1">
                           ${item.price.toLocaleString()}
                         </p>
                         <div className="flex items-center justify-between mt-3">
@@ -140,17 +140,17 @@ export function CartView() {
                     </span>
                   </div>
                   {shipping === 0 && (
-                    <p className="text-xs text-emerald-600">Free shipping on orders over $5,000</p>
+                    <p className="text-xs text-emerald-600">Free shipping on orders over $99</p>
                   )}
                   <Separator />
                   <div className="flex justify-between">
                     <span className="font-semibold text-slate-900">Total</span>
-                    <span className="text-xl font-bold text-teal-600">${total.toLocaleString()}</span>
+                    <span className="text-xl font-bold text-amber-700">${total.toLocaleString()}</span>
                   </div>
                 </div>
                 <Button
                   size="lg"
-                  className="w-full mt-6 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-xl shadow-lg shadow-teal-500/25"
+                  className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-lg shadow-slate-500/25"
                   onClick={() => setView('checkout')}
                 >
                   Proceed to Checkout

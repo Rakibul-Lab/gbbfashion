@@ -29,44 +29,51 @@ const navCategories = [
     subcategories: [],
   },
   {
-    value: 'diagnostics',
-    label: 'DIAGNOSTICS',
+    value: 'women',
+    label: 'WOMEN',
     subcategories: [
-      { value: 'handheld-scanners', label: 'Handheld Scanners' },
-      { value: 'vision-systems', label: 'Vision Systems' },
-      { value: 'thermal-imaging', label: 'Thermal Imaging' },
+      { value: 'hand-bag', label: 'Hand Bag' },
+      { value: 'cross-body-bag', label: 'Cross Body Bag' },
+      { value: 'shoulder-bag', label: 'Shoulder Bag' },
+      { value: 'tote-bag', label: 'Tote Bag' },
+      { value: 'mini-bag', label: 'Mini Bag' },
+      { value: 'bag-pack', label: 'Bag Pack' },
     ],
   },
   {
-    value: 'predictive',
-    label: 'PREDICTIVE',
+    value: 'men',
+    label: 'MEN',
     subcategories: [
-      { value: 'prediction-engines', label: 'Prediction Engines' },
-      { value: 'safety-systems', label: 'Safety Systems' },
+      { value: 'bag-pack', label: 'Bag Pack Bag' },
+      { value: 'long-wallet', label: 'Money Bag / Long Wallet' },
     ],
   },
   {
-    value: 'monitoring',
-    label: 'MONITORING',
+    value: 'shoes',
+    label: 'SHOES',
     subcategories: [
-      { value: 'sensor-hubs', label: 'Sensor Hubs' },
-      { value: 'mesh-networks', label: 'Mesh Networks' },
+      { value: 'man-shoes', label: 'Man Shoes' },
+      { value: 'women-shoes', label: 'Women Shoes' },
     ],
   },
   {
-    value: 'robotic',
-    label: 'ROBOTIC',
+    value: 'belt',
+    label: 'BELT',
     subcategories: [
-      { value: 'robotic-arms', label: 'Robotic Arms' },
-      { value: 'maintenance-drones', label: 'Maintenance Drones' },
+      { value: 'male-belt', label: 'Male' },
+      { value: 'female-belt', label: 'Female' },
     ],
   },
   {
-    value: 'analytics',
-    label: 'ANALYTICS',
+    value: 'kids',
+    label: 'KIDS',
+    subcategories: [],
+  },
+  {
+    value: 'accessories',
+    label: 'ACCESSORIES',
     subcategories: [
-      { value: 'analytics-platforms', label: 'Analytics Platforms' },
-      { value: 'cloud-solutions', label: 'Cloud Solutions' },
+      { value: 'key-holder', label: 'Key Holder (Leather)' },
     ],
   },
   {
@@ -130,7 +137,6 @@ export function Header() {
     }, 150)
   }
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (dropdownTimeoutRef.current) {
@@ -140,8 +146,8 @@ export function Header() {
   }, [])
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white">
-      {/* Announcement Bar */}
+    <header className="sticky top-0 z-50 w-full">
+      {/* Top Bar - Black background matching gbbfashion.com */}
       <div className="bg-slate-900 text-white text-center py-2 px-4">
         <p className="text-xs sm:text-sm tracking-wide">
           New arrivals just dropped — explore the collection.{' '}
@@ -150,28 +156,25 @@ export function Header() {
               setCategoryFilter('all')
               setView('shop')
             }}
-            className="font-semibold text-teal-400 hover:text-teal-300 transition-colors underline underline-offset-2"
+            className="font-semibold text-amber-400 hover:text-amber-300 transition-colors underline underline-offset-2"
           >
             SHOP NOW
           </button>
         </p>
       </div>
 
-      {/* Main Header */}
-      <div className="border-b border-slate-100">
+      {/* Main Header - Dark background */}
+      <div className="bg-slate-900">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
+          <div className="flex h-14 sm:h-16 items-center justify-between">
             {/* Logo */}
             <button
               onClick={() => setView('home')}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-teal-600 to-emerald-600">
-                <span className="text-white font-bold text-sm">B</span>
-              </div>
-              <span className="text-xl font-bold tracking-tight">
-                <span className="text-teal-600">Baand</span>{' '}
-                <span className="text-slate-900">GBB</span>
+              <span className="text-xl sm:text-2xl font-bold tracking-tight" style={{ fontFamily: 'Jost, sans-serif' }}>
+                <span className="text-white">Baand</span>{' '}
+                <span className="text-amber-400">GBB</span>
               </span>
             </button>
 
@@ -186,13 +189,14 @@ export function Header() {
                 >
                   <button
                     onClick={() => handleCategoryClick(cat.value)}
-                    className={`px-3 py-2 text-[13px] font-semibold tracking-wider transition-colors whitespace-nowrap ${
+                    className={`px-3 py-2 text-[13px] font-medium tracking-wider transition-colors whitespace-nowrap ${
                       activeDropdown === cat.value
-                        ? 'text-teal-600'
+                        ? 'text-amber-400'
                         : cat.value === 'prime-drop'
-                        ? 'text-rose-600 hover:text-rose-700'
-                        : 'text-slate-700 hover:text-teal-600'
+                        ? 'text-rose-400 hover:text-rose-300'
+                        : 'text-white/80 hover:text-white'
                     }`}
+                    style={{ fontFamily: 'Jost, sans-serif' }}
                   >
                     {cat.label}
                     {cat.subcategories.length > 0 && (
@@ -208,13 +212,13 @@ export function Header() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 4 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute top-full left-0 bg-white border border-slate-100 rounded-lg shadow-xl shadow-slate-200/50 py-2 min-w-[200px] z-50"
+                        className="absolute top-full left-0 bg-white border border-slate-100 rounded-lg shadow-xl py-2 min-w-[220px] z-50"
                       >
                         {cat.subcategories.map((sub) => (
                           <button
                             key={sub.value}
                             onClick={() => handleSubCategoryClick(cat.value, sub.value)}
-                            className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:text-teal-600 hover:bg-slate-50 transition-colors"
+                            className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:text-amber-700 hover:bg-amber-50 transition-colors capitalize"
                           >
                             {sub.label}
                           </button>
@@ -222,7 +226,7 @@ export function Header() {
                         <div className="border-t border-slate-100 my-1" />
                         <button
                           onClick={() => handleCategoryClick(cat.value)}
-                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-teal-600 hover:bg-teal-50 transition-colors"
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors uppercase tracking-wider"
                         >
                           View All {cat.label}
                         </button>
@@ -240,16 +244,16 @@ export function Header() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setSearchOpen(!searchOpen)}
-                className="text-slate-500 hover:text-teal-600 h-10 w-10"
+                className="text-white/70 hover:text-white hover:bg-white/10 h-10 w-10"
               >
                 <Search className="h-5 w-5" />
               </Button>
 
-              {/* Wishlist placeholder */}
+              {/* Wishlist */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="hidden sm:flex text-slate-500 hover:text-teal-600 h-10 w-10"
+                className="hidden sm:flex text-white/70 hover:text-white hover:bg-white/10 h-10 w-10"
               >
                 <Heart className="h-5 w-5" />
               </Button>
@@ -258,7 +262,7 @@ export function Header() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="hidden sm:flex text-slate-500 hover:text-teal-600 h-10 w-10"
+                className="hidden sm:flex text-white/70 hover:text-white hover:bg-white/10 h-10 w-10"
               >
                 <User className="h-5 w-5" />
               </Button>
@@ -268,22 +272,22 @@ export function Header() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setView('cart')}
-                className="relative text-slate-500 hover:text-teal-600 h-10 w-10"
+                className="relative text-white/70 hover:text-white hover:bg-white/10 h-10 w-10"
               >
                 <ShoppingCart className="h-5 w-5" />
                 {count > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-teal-600 text-[10px] font-bold text-white">
+                  <span className="absolute -top-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
                     {count > 99 ? '99+' : count}
                   </span>
                 )}
               </Button>
 
-              {/* Admin (hidden, accessible via icon) */}
+              {/* Admin */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setView('admin')}
-                className="hidden sm:flex text-slate-300 hover:text-slate-500 h-10 w-10"
+                className="hidden sm:flex text-white/30 hover:text-white/60 hover:bg-white/10 h-10 w-10"
               >
                 <Settings className="h-4 w-4" />
               </Button>
@@ -291,16 +295,16 @@ export function Header() {
               {/* Mobile menu */}
               <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="lg:hidden text-slate-600 h-10 w-10">
+                  <Button variant="ghost" size="icon" className="lg:hidden text-white hover:bg-white/10 h-10 w-10">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-80 p-0">
                   <div className="flex flex-col h-full">
                     <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                      <SheetTitle className="text-lg font-bold">
-                        <span className="text-teal-600">Baand</span>{' '}
-                        <span className="text-slate-900">GBB</span>
+                      <SheetTitle className="text-lg font-bold" style={{ fontFamily: 'Jost, sans-serif' }}>
+                        <span className="text-slate-900">Baand</span>{' '}
+                        <span className="text-amber-600">GBB</span>
                       </SheetTitle>
                     </div>
                     <nav className="flex-1 overflow-y-auto py-2">
@@ -313,6 +317,7 @@ export function Header() {
                                   ? 'text-rose-600'
                                   : 'text-slate-700'
                               }`}
+                              style={{ fontFamily: 'Jost, sans-serif' }}
                               onClick={() => {
                                 handleCategoryClick(cat.value)
                                 setMobileOpen(false)
@@ -341,7 +346,7 @@ export function Header() {
                                 {cat.subcategories.map((sub) => (
                                   <button
                                     key={sub.value}
-                                    className="w-full text-left pl-8 pr-4 py-2.5 text-sm text-slate-500 hover:text-teal-600 hover:bg-slate-50 transition-colors"
+                                    className="w-full text-left pl-8 pr-4 py-2.5 text-sm text-slate-500 hover:text-amber-700 hover:bg-amber-50 transition-colors capitalize"
                                     onClick={() => {
                                       handleSubCategoryClick(cat.value, sub.value)
                                       setMobileOpen(false)
@@ -357,16 +362,16 @@ export function Header() {
                       ))}
                       <div className="border-t border-slate-100 my-2" />
                       <button
-                        className="w-full text-left px-4 py-3 text-sm text-slate-500 hover:text-teal-600 transition-colors"
+                        className="w-full text-left px-4 py-3 text-sm text-slate-500 hover:text-amber-700 transition-colors"
                         onClick={() => { setView('cart'); setMobileOpen(false) }}
                       >
-                        🛒 Cart ({count})
+                        Cart ({count})
                       </button>
                       <button
-                        className="w-full text-left px-4 py-3 text-sm text-slate-500 hover:text-teal-600 transition-colors"
+                        className="w-full text-left px-4 py-3 text-sm text-slate-500 hover:text-amber-700 transition-colors"
                         onClick={() => { setView('admin'); setMobileOpen(false) }}
                       >
-                        ⚙️ Admin Dashboard
+                        Admin Dashboard
                       </button>
                     </nav>
                   </div>
@@ -385,14 +390,14 @@ export function Header() {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="border-b border-slate-100 bg-white overflow-hidden"
+            className="border-b border-slate-200 bg-white overflow-hidden"
           >
             <div className="mx-auto max-w-2xl px-4 py-4">
               <form onSubmit={handleSearch} className="flex items-center gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Search for products..."
+                    placeholder="Search for bags, shoes, accessories..."
                     value={searchValue}
                     onChange={(e) => setSearchValue(e.target.value)}
                     className="pl-9 rounded-lg border-slate-200 h-11"

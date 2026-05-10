@@ -5,29 +5,34 @@ import { motion } from 'framer-motion'
 
 const categories = [
   {
-    id: 'diagnostics',
-    label: 'Diagnostics',
-    image: '/categories/diagnostics.jpg',
+    id: 'women',
+    label: "Women's Bags",
+    image: '/categories/women-bags.png',
   },
   {
-    id: 'predictive',
-    label: 'Predictive',
-    image: '/categories/predictive.jpg',
+    id: 'men',
+    label: "Men's Bags",
+    image: '/categories/men-bags.png',
   },
   {
-    id: 'monitoring',
-    label: 'Monitoring',
-    image: '/categories/monitoring.jpg',
+    id: 'shoes',
+    label: 'Shoes',
+    image: '/categories/shoes.png',
   },
   {
-    id: 'robotic',
-    label: 'Robotic',
-    image: '/categories/robotic.jpg',
+    id: 'accessories',
+    label: 'Accessories',
+    image: '/categories/accessories.png',
   },
   {
-    id: 'analytics',
-    label: 'Analytics',
-    image: '/categories/analytics.jpg',
+    id: 'belt',
+    label: 'Belt',
+    image: '/categories/belt.png',
+  },
+  {
+    id: 'kids',
+    label: 'Kids',
+    image: '/categories/kids.png',
   },
 ]
 
@@ -42,7 +47,13 @@ export function CategoryCards() {
   return (
     <section className="py-12 sm:py-16 bg-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+        {/* Section Header */}
+        <div className="text-center mb-8 sm:mb-10">
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">Shop by Category</h2>
+          <p className="mt-2 text-sm text-slate-500">Explore our curated collections</p>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
           {categories.map((cat, index) => (
             <motion.div
               key={cat.id}
@@ -53,19 +64,22 @@ export function CategoryCards() {
               className="group cursor-pointer"
               onClick={() => handleCategoryClick(cat.id)}
             >
-              <div className="relative aspect-[16/10] rounded-xl overflow-hidden bg-slate-100">
+              <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-100">
                 <img
                   src={cat.image}
                   alt={cat.label}
                   className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
                 />
-                {/* Subtle overlay on hover */}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+                {/* Overlay with category name */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-3">
+                  <p className="text-white text-xs sm:text-sm font-semibold text-center drop-shadow-lg">
+                    {cat.label}
+                  </p>
+                </div>
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-amber-400/0 group-hover:bg-amber-400/10 transition-colors duration-300" />
               </div>
-              {/* Category label below image */}
-              <p className="text-center text-sm font-semibold text-slate-700 mt-2.5 group-hover:text-teal-600 transition-colors">
-                {cat.label}
-              </p>
             </motion.div>
           ))}
         </div>

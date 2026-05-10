@@ -83,7 +83,7 @@ export function OrderConfirmation() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Package className="h-5 w-5 text-teal-600" />
+                    <Package className="h-5 w-5 text-amber-700" />
                     <h2 className="text-lg font-semibold text-slate-900">Order Details</h2>
                   </div>
                   <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
@@ -136,7 +136,7 @@ export function OrderConfirmation() {
 
                 <div className="flex justify-between">
                   <span className="text-lg font-semibold text-slate-900">Total</span>
-                  <span className="text-lg font-bold text-teal-600">
+                  <span className="text-lg font-bold text-amber-700">
                     ${order.totalAmount.toLocaleString()}
                   </span>
                 </div>
@@ -153,7 +153,7 @@ export function OrderConfirmation() {
         >
           <Button
             onClick={() => setView('shop')}
-            className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-xl"
+            className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl"
           >
             Continue Shopping
             <ArrowRight className="ml-2 h-4 w-4" />

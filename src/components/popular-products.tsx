@@ -23,8 +23,6 @@ const badgeColors: Record<string, string> = {
   'New': 'bg-teal-100 text-teal-700 border-teal-200',
   'Premium': 'bg-amber-100 text-amber-700 border-amber-200',
   'Popular': 'bg-rose-100 text-rose-700 border-rose-200',
-  'Innovative': 'bg-violet-100 text-violet-700 border-violet-200',
-  'SaaS': 'bg-cyan-100 text-cyan-700 border-cyan-200',
 }
 
 const tabs: { value: ProductTab; label: string }[] = [
@@ -46,10 +44,8 @@ export function PopularProducts() {
 
   const filteredProducts = useMemo(() => {
     if (productTab === 'new') {
-      // NEW IN TREND: products with badge "New" or badge "Innovative"
-      return products.filter((p) => p.badge === 'New' || p.badge === 'Innovative' || p.badge === null)
+      return products.filter((p) => p.badge === 'New' || p.badge === null)
     } else {
-      // PRIME DROP: products with badge "Premium", "Best Seller", "Popular"
       return products.filter((p) => p.badge && primeDropBadges.includes(p.badge))
     }
   }, [products, productTab])
@@ -70,11 +66,11 @@ export function PopularProducts() {
         {/* Section Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">Popular Products</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900" style={{ fontFamily: 'Jost, sans-serif' }}>Popular Products</h2>
           </div>
           <button
             onClick={() => setView('shop')}
-            className="text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors flex items-center gap-1"
+            className="text-sm font-medium text-amber-700 hover:text-amber-800 transition-colors flex items-center gap-1"
           >
             Explore All
             <ChevronRight className="h-4 w-4" />
@@ -89,15 +85,16 @@ export function PopularProducts() {
               onClick={() => setProductTab(tab.value)}
               className={`relative px-5 py-3 text-sm font-semibold tracking-wider transition-colors ${
                 productTab === tab.value
-                  ? 'text-teal-600'
+                  ? 'text-amber-700'
                   : 'text-slate-400 hover:text-slate-600'
               }`}
+              style={{ fontFamily: 'Jost, sans-serif' }}
             >
               {tab.label}
               {productTab === tab.value && (
                 <motion.div
                   layoutId="product-tab-indicator"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-600"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600"
                   transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
                 />
               )}
@@ -107,18 +104,16 @@ export function PopularProducts() {
 
         {/* Carousel */}
         <div className="relative">
-          {/* Scroll Left Button */}
           <button
             onClick={() => scroll('left')}
-            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-10 hidden sm:flex h-9 w-9 items-center justify-center rounded-full bg-white border border-slate-200 shadow-md hover:shadow-lg transition-shadow text-slate-600 hover:text-teal-600"
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-10 hidden sm:flex h-9 w-9 items-center justify-center rounded-full bg-white border border-slate-200 shadow-md hover:shadow-lg transition-shadow text-slate-600 hover:text-amber-700"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
 
-          {/* Product Cards Row */}
           <div
             ref={scrollRef}
-            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide"
+            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-4 -mx-4 px-4 sm:mx-0 sm:px-0"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {filteredProducts.map((product) => (
@@ -129,8 +124,7 @@ export function PopularProducts() {
                 transition={{ duration: 0.3 }}
                 className="snap-start shrink-0 w-[220px] sm:w-[240px]"
               >
-                <div className="group bg-white rounded-xl border border-slate-100 overflow-hidden hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300">
-                  {/* Product Image */}
+                <div className="group bg-white rounded-xl border border-slate-100 overflow-hidden hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-300">
                   <div
                     className="relative aspect-square overflow-hidden bg-slate-50 cursor-pointer"
                     onClick={() => {
@@ -152,10 +146,9 @@ export function PopularProducts() {
                     )}
                   </div>
 
-                  {/* Product Info */}
                   <div className="p-3.5">
                     <h3
-                      className="font-medium text-sm text-slate-900 line-clamp-1 cursor-pointer hover:text-teal-600 transition-colors"
+                      className="font-medium text-sm text-slate-900 line-clamp-1 cursor-pointer hover:text-amber-700 transition-colors"
                       onClick={() => {
                         selectProduct(product.id)
                         setView('product')
@@ -168,7 +161,7 @@ export function PopularProducts() {
                       <span className="text-xs text-slate-500">{product.rating}</span>
                     </div>
                     <div className="flex items-center justify-between mt-2.5">
-                      <span className="text-base font-bold text-teal-600">
+                      <span className="text-base font-bold text-amber-700">
                         ${product.price.toLocaleString()}
                       </span>
                       <Button
@@ -181,7 +174,7 @@ export function PopularProducts() {
                             image: product.image,
                           })
                         }
-                        className="bg-teal-600 hover:bg-teal-700 text-white rounded-lg h-8 w-8 p-0"
+                        className="bg-slate-900 hover:bg-slate-800 text-white rounded-lg h-8 w-8 p-0"
                       >
                         <ShoppingCart className="h-3.5 w-3.5" />
                       </Button>
@@ -192,10 +185,9 @@ export function PopularProducts() {
             ))}
           </div>
 
-          {/* Scroll Right Button */}
           <button
             onClick={() => scroll('right')}
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 z-10 hidden sm:flex h-9 w-9 items-center justify-center rounded-full bg-white border border-slate-200 shadow-md hover:shadow-lg transition-shadow text-slate-600 hover:text-teal-600"
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 z-10 hidden sm:flex h-9 w-9 items-center justify-center rounded-full bg-white border border-slate-200 shadow-md hover:shadow-lg transition-shadow text-slate-600 hover:text-amber-700"
           >
             <ChevronRight className="h-4 w-4" />
           </button>

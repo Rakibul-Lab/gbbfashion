@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Baand GBB - AI-Powered Maintenance Solutions",
-  description: "Next-generation AI tools that predict, diagnose, and resolve maintenance challenges before they impact your operations.",
-  keywords: ["AI maintenance", "predictive maintenance", "diagnostics", "Baand GBB", "smart monitoring"],
+  title: "Baand GBB - Premium Fashion & Leather Goods",
+  description: "Discover premium leather bags, shoes, belts, and accessories at Baand GBB. Crafted with care, designed for elegance.",
+  keywords: ["fashion", "leather bags", "handbags", "shoes", "belts", "accessories", "Baand GBB"],
   authors: [{ name: "Baand GBB" }],
   icons: {
     icon: "/logo.svg",

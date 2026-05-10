@@ -90,19 +90,20 @@ const statusColors: Record<string, string> = {
 }
 
 const categoryOptions = [
-  { value: 'diagnostics', label: 'AI Diagnostics' },
-  { value: 'predictive', label: 'Predictive Maintenance' },
-  { value: 'monitoring', label: 'Smart Monitoring' },
-  { value: 'robotic', label: 'Robotic Maintenance' },
-  { value: 'analytics', label: 'AI Analytics' },
+  { value: 'women', label: "Women's Bags" },
+  { value: 'men', label: "Men's Bags" },
+  { value: 'shoes', label: 'Shoes' },
+  { value: 'belt', label: 'Belt' },
+  { value: 'kids', label: 'Kids' },
+  { value: 'accessories', label: 'Accessories' },
 ]
 
 const emptyProduct: Omit<Product, 'id'> = {
   name: '',
   description: '',
   price: 0,
-  category: 'diagnostics',
-  image: '/products/ai-diagnostic-scanner.png',
+  category: 'women',
+  image: '/products/women-hand-bag.png',
   features: '',
   rating: 4.5,
   inStock: true,
@@ -253,7 +254,7 @@ export function AdminDashboard() {
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
       </div>
     )
   }
@@ -271,7 +272,7 @@ export function AdminDashboard() {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[
-            { label: 'Total Products', value: totalProducts, icon: Package, color: 'text-teal-600', bg: 'bg-teal-50' },
+            { label: 'Total Products', value: totalProducts, icon: Package, color: 'text-slate-700', bg: 'bg-slate-100' },
             { label: 'Total Orders', value: totalOrders, icon: ShoppingCart, color: 'text-emerald-600', bg: 'bg-emerald-50' },
             { label: 'Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-50' },
             { label: 'Pending Orders', value: pendingOrders, icon: Clock, color: 'text-rose-600', bg: 'bg-rose-50' },
@@ -319,7 +320,7 @@ export function AdminDashboard() {
                         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                       }}
                     />
-                    <Bar dataKey="products" fill="#0d9488" radius={[4, 4, 0, 0]} name="Products" />
+                    <Bar dataKey="products" fill="#b45309" radius={[4, 4, 0, 0]} name="Products" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -342,7 +343,7 @@ export function AdminDashboard() {
                 <Button
                   size="sm"
                   onClick={openCreateDialog}
-                  className="bg-teal-600 hover:bg-teal-700 text-white rounded-lg"
+                  className="bg-slate-900 hover:bg-slate-800 text-white rounded-lg"
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Add Product
@@ -597,8 +598,6 @@ export function AdminDashboard() {
                       <SelectItem value="New">New</SelectItem>
                       <SelectItem value="Premium">Premium</SelectItem>
                       <SelectItem value="Popular">Popular</SelectItem>
-                      <SelectItem value="Innovative">Innovative</SelectItem>
-                      <SelectItem value="SaaS">SaaS</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -630,7 +629,7 @@ export function AdminDashboard() {
               <Button
                 onClick={handleSaveProduct}
                 disabled={saving}
-                className="bg-teal-600 hover:bg-teal-700 text-white rounded-lg"
+                className="bg-slate-900 hover:bg-slate-800 text-white rounded-lg"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                 {editingProduct ? 'Update' : 'Create'}
