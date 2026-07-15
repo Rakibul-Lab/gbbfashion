@@ -252,8 +252,8 @@ const badgeOptions = [
 
 const collectionOptions = [
   { value: '', label: 'None' },
-  { value: 'bags', label: 'Bags' },
-  { value: 'shoes', label: 'Shoes' },
+  { value: 'bags', label: 'Prime Bags (homepage)' },
+  { value: 'shoes', label: 'Prime Shoes (homepage)' },
 ]
 
 const emptyProduct: Omit<Product, 'id' | 'createdAt'> = {
@@ -2211,7 +2211,9 @@ export function AdminDashboard() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium text-slate-800">Featured</p>
-                    <p className="text-[11px] text-slate-400">Homepage featured placements</p>
+                    <p className="text-[11px] text-slate-400">
+                      New In Trend homepage tab (not Prime Bags/Shoes)
+                    </p>
                   </div>
                   <Switch
                     checked={productForm.isFeatured}
@@ -2298,7 +2300,7 @@ export function AdminDashboard() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Collection</Label>
+                  <Label>Homepage collection</Label>
                   <Select
                     value={productForm.collection || '__none__'}
                     onValueChange={(v) =>
@@ -2319,6 +2321,9 @@ export function AdminDashboard() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-[11px] text-slate-400">
+                    Assign to Prime Bags or Prime Shoes carousel on the homepage
+                  </p>
                 </div>
               </CardContent>
             </Card>

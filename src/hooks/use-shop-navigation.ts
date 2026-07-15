@@ -21,6 +21,7 @@ export function useShopNavigation() {
       category?: string
       subCategory?: string | null
       shopMode?: ShopMode
+      collection?: string | null
     } = {}) => {
       const category = options.category ?? 'all'
       const shopMode = options.shopMode ?? resolveShopMode(category)

@@ -11,7 +11,12 @@ import {
   normalizePromoBanners,
   type PromoBannerConfig,
 } from '@/lib/site-settings-client'
+import { trackSelectPromotion } from '@/lib/gtm'
 
+/**
+ * Promo banners — use mount `animate` (not whileInView) so copy never stays at
+ * opacity 0 when the section is revealed via ProgressiveHome / late layout on cPanel.
+ */
 export function PromoBanners() {
   const { goToShop } = useShopNavigation()
   const { get } = useSectionMedia()
@@ -48,6 +53,7 @@ export function PromoBanners() {
           url: slot.url || banner.mediaUrl || banner.image,
         }
         const alignRight = index % 2 === 1
+        const baseDelay = 0.08
 
         return (
           <div
@@ -79,10 +85,9 @@ export function PromoBanners() {
             <div className="absolute inset-0 z-[4] flex items-center">
               <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full">
                 <motion.div
-                  initial={{ opacity: 0, x: alignRight ? 40 : -40 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true, margin: '-80px' }}
-                  transition={{ duration: 0.7, ease: 'easeOut' }}
+                  initial={{ opacity: 0, x: alignRight ? 36 : -36 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: baseDelay }}
                   className={`max-w-lg ${
                     alignRight ? 'mx-auto sm:ml-auto text-center sm:text-right' : ''
                   }`}
@@ -90,19 +95,17 @@ export function PromoBanners() {
                   {!alignRight ? (
                     <>
                       <motion.span
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        viewport={{ once: true, margin: '-80px' }}
-                        transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
+                        initial={{ opacity: 0, scale: 0.94 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.6, delay: baseDelay + 0.1, ease: 'easeOut' }}
                         className="inline-block text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-tight mb-3"
                       >
                         {banner.subtitle}
                       </motion.span>
                       <motion.h2
-                        initial={{ opacity: 0, y: 15 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true, margin: '-80px' }}
-                        transition={{ duration: 0.6, delay: 0.25, ease: 'easeOut' }}
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: baseDelay + 0.22, ease: 'easeOut' }}
                         className="text-lg sm:text-2xl lg:text-3xl font-bold tracking-wider uppercase text-white/90 mb-4"
                       >
                         {banner.title}
@@ -111,19 +114,17 @@ export function PromoBanners() {
                   ) : (
                     <>
                       <motion.h2
-                        initial={{ opacity: 0, y: 15 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true, margin: '-80px' }}
-                        transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: baseDelay + 0.1, ease: 'easeOut' }}
                         className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-wider uppercase text-white mb-3"
                       >
                         {banner.title}
                       </motion.h2>
                       <motion.p
-                        initial={{ opacity: 0, y: 15 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true, margin: '-80px' }}
-                        transition={{ duration: 0.6, delay: 0.3, ease: 'easeOut' }}
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: baseDelay + 0.25, ease: 'easeOut' }}
                         className="text-sm sm:text-base text-white/70 leading-relaxed mb-7 max-w-sm mx-auto sm:ml-auto"
                       >
                         {banner.subtitle}
@@ -132,21 +133,30 @@ export function PromoBanners() {
                   )}
 
                   <motion.div
-                    initial={{ scaleX: 0 }}
-                    whileInView={{ scaleX: 1 }}
-                    viewport={{ once: true, margin: '-80px' }}
-                    transition={{ duration: 0.5, delay: 0.35, ease: 'easeOut' }}
+                    initial={{ scaleX: 0, opacity: 0.6 }}
+                    animate={{ scaleX: 1, opacity: 1 }}
+                    transition={{ duration: 0.5, delay: baseDelay + 0.32, ease: 'easeOut' }}
                     className={`w-14 h-1 bg-gradient-to-r from-amber-400 to-amber-600 mb-6 origin-left rounded-full ${
-                      alignRight ? 'mx-auto sm:ml-auto origin-center sm:origin-right bg-gradient-to-l' : ''
+                      alignRight
+                        ? 'mx-auto sm:ml-auto origin-center sm:origin-right bg-gradient-to-l'
+                        : ''
                     }`}
                   />
 
                   <motion.button
-                    initial={{ opacity: 0, y: 15 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: '-80px' }}
-                    transition={{ duration: 0.6, delay: 0.45, ease: 'easeOut' }}
-                    onClick={() => goToShop({ category: banner.linkCategory })}
+                    type="button"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.55, delay: baseDelay + 0.4, ease: 'easeOut' }}
+                    onClick={() => {
+                      trackSelectPromotion({
+                        promotion_id: banner.id,
+                        promotion_name: banner.title,
+                        creative_name: banner.subtitle,
+                        creative_slot: slotKey,
+                      })
+                      goToShop({ category: banner.linkCategory })
+                    }}
                     className={
                       alignRight
                         ? 'group inline-flex items-center justify-center gap-2.5 border-2 border-white/80 text-white px-6 sm:px-8 py-3 sm:py-4 text-sm font-bold tracking-wider uppercase hover:bg-white hover:text-slate-900 transition-all duration-300 backdrop-blur-sm active:scale-[0.98]'

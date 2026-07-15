@@ -6,6 +6,7 @@ import type { ShopRouteParams } from '@/lib/shop-navigation'
 import { buildViewPath } from '@/lib/view-routes'
 import { appNavigate } from '@/lib/app-navigate'
 import { cartLineKey } from '@/lib/product-colors'
+import { trackAddToCart } from '@/lib/gtm'
 
 /**
  * Blocks localStorage writes until persist has rehydrated.
@@ -123,6 +124,8 @@ interface StoreState {
   orderId: string | null
   categoryFilter: string
   subCategoryFilter: string | null
+  /** Homepage Prime Bags / Shoes → shop filter (`bags` | `shoes`) */
+  collectionFilter: string | null
   shopMode: ShopMode
   searchQuery: string
   productTab: ProductTab
@@ -136,18 +139,20 @@ interface StoreState {
   setView: (view: ViewType, options?: { replace?: boolean; syncUrl?: boolean }) => void
   setAccountTab: (tab: AccountTab, options?: { syncUrl?: boolean }) => void
   selectProduct: (productId: string | null) => void
-  addToCart: (item: Omit<CartItem, 'quantity'>) => void
+  addToCart: (item: Omit<CartItem, 'quantity'>, quantity?: number) => void
   removeFromCart: (productId: string, color?: string | null) => void
   updateQuantity: (productId: string, quantity: number, color?: string | null) => void
   clearCart: () => void
   setOrderId: (orderId: string | null) => void
   setCategoryFilter: (category: string) => void
   setSubCategoryFilter: (subCategory: string | null) => void
+  setCollectionFilter: (collection: string | null) => void
   setShopMode: (mode: ShopMode) => void
   navigateToShop: (options?: {
     category?: string
     subCategory?: string | null
     shopMode?: ShopMode
+    collection?: string | null
     updateUrl?: boolean
   }) => void
   applyShopRoute: (params: ShopRouteParams) => void
@@ -197,6 +202,7 @@ export const useStore = create<StoreState>()(
       orderId: null,
       categoryFilter: 'all',
       subCategoryFilter: null,
+      collectionFilter: null,
       shopMode: 'browse',
       searchQuery: '',
       productTab: 'new',
@@ -227,7 +233,8 @@ export const useStore = create<StoreState>()(
 
       selectProduct: (productId) => set({ selectedProductId: productId }),
 
-      addToCart: (item) => {
+      addToCart: (item, quantity = 1) => {
+        const qty = Math.max(1, Math.floor(quantity) || 1)
         const userId = get().user?.id
         const { cart } = get()
         const key = cartLineKey(item.productId, item.color)
@@ -239,16 +246,25 @@ export const useStore = create<StoreState>()(
               cartLineKey(c.productId, c.color) === key
                 ? {
                     ...c,
-                    quantity: c.quantity + 1,
+                    quantity: c.quantity + qty,
                     image: item.image || c.image,
                     colorSwatch: item.colorSwatch ?? c.colorSwatch,
                   }
                 : c
             )
-          : [...cart, { ...item, quantity: 1 }]
+          : [...cart, { ...item, quantity: qty }]
 
         set({ cart: nextCart })
         syncActiveUserCart(userId, nextCart)
+
+        trackAddToCart({
+          item_id: item.productId,
+          item_name: item.name,
+          item_variant:
+            item.color && item.color !== 'Default' ? item.color : undefined,
+          price: item.price,
+          quantity: qty,
+        })
       },
 
       removeFromCart: (productId, color) => {
@@ -285,6 +301,7 @@ export const useStore = create<StoreState>()(
       setOrderId: (orderId) => set({ orderId }),
       setCategoryFilter: (category) => set({ categoryFilter: category }),
       setSubCategoryFilter: (subCategory) => set({ subCategoryFilter: subCategory }),
+      setCollectionFilter: (collection) => set({ collectionFilter: collection }),
       setShopMode: (mode) => set({ shopMode: mode }),
 
       navigateToShop: (options = {}) => {
@@ -292,12 +309,19 @@ export const useStore = create<StoreState>()(
         const shopMode = options.shopMode ?? resolveShopMode(category)
         const isSpecial = shopMode === 'new-arrivals' || shopMode === 'prime-drop'
         const subCategory = isSpecial ? null : (options.subCategory ?? null)
+        const collection =
+          options.collection !== undefined
+            ? options.collection
+            : options.category !== undefined
+              ? null
+              : get().collectionFilter
 
         set({
           view: 'shop',
           shopMode,
           categoryFilter: isSpecial ? 'all' : category,
           subCategoryFilter: subCategory,
+          collectionFilter: isSpecial ? null : collection,
           productTab:
             shopMode === 'prime-drop'
               ? 'prime'
@@ -319,6 +343,7 @@ export const useStore = create<StoreState>()(
           shopMode,
           categoryFilter: isSpecial ? 'all' : category,
           subCategoryFilter: isSpecial ? null : (params.subCategory ?? null),
+          collectionFilter: isSpecial ? null : get().collectionFilter,
           productTab:
             shopMode === 'prime-drop'
               ? 'prime'

@@ -34,6 +34,7 @@ import {
   type ProductColorVariant,
 } from '@/lib/product-colors'
 import { useCurrency } from '@/hooks/use-currency'
+import { normalizePrimeCollection } from '@/lib/prime-collection'
 
 interface Product {
   id: string
@@ -53,6 +54,7 @@ interface Product {
   isNewArrival?: boolean
   isPrimeDrop?: boolean
   isFeatured?: boolean
+  collection?: string | null
 }
 
 const badgeColors: Record<string, string> = {
@@ -156,6 +158,7 @@ export function ProductGrid() {
   const {
     categoryFilter,
     subCategoryFilter,
+    collectionFilter,
     shopMode,
     setSubCategoryFilter,
     searchQuery,
@@ -241,6 +244,12 @@ export function ProductGrid() {
       )
     }
 
+    if (collectionFilter === 'bags' || collectionFilter === 'shoes') {
+      result = result.filter(
+        (p) => normalizePrimeCollection(p.collection) === collectionFilter
+      )
+    }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       result = result.filter(
@@ -265,7 +274,7 @@ export function ProductGrid() {
     }
 
     return result
-  }, [products, shopMode, categoryFilter, subCategoryFilter, searchQuery, sortBy, priceMax])
+  }, [products, shopMode, categoryFilter, subCategoryFilter, collectionFilter, searchQuery, sortBy, priceMax])
 
   const showCategoryHero = shopMode !== 'browse'
 
