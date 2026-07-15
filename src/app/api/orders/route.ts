@@ -202,36 +202,41 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    let invoiceEmailSent = false
+    // Never block checkout on SMTP — shared hosts often hang on external mail.
+    // Order is already saved; email runs in the background.
+    let invoiceEmailQueued = false
     if (emailNormalized) {
-      try {
-        const mailResult = await sendOrderInvoiceEmail({
-          id: order.id,
-          customerName: order.customerName,
-          customerEmail: order.customerEmail,
-          customerPhone: order.customerPhone,
-          shippingAddress: order.shippingAddress,
-          city: order.city,
-          state: order.state,
-          zipCode: order.zipCode,
-          totalAmount: order.totalAmount,
-          status: order.status,
-          paymentMethod: order.paymentMethod,
-          paymentStatus: order.paymentStatus,
-          createdAt: order.createdAt,
-          items: order.items.map((item) => ({
-            productName: item.productName,
-            quantity: item.quantity,
-            price: item.price,
-          })),
+      invoiceEmailQueued = true
+      void sendOrderInvoiceEmail({
+        id: order.id,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        customerPhone: order.customerPhone,
+        shippingAddress: order.shippingAddress,
+        city: order.city,
+        state: order.state,
+        zipCode: order.zipCode,
+        totalAmount: order.totalAmount,
+        status: order.status,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        createdAt: order.createdAt,
+        items: order.items.map((item) => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+      })
+        .then((mailResult) => {
+          if (!mailResult.ok) {
+            console.warn('[orders] invoice email skipped:', mailResult.reason)
+          } else {
+            console.info('[orders] invoice email sent:', order.id)
+          }
         })
-        invoiceEmailSent = mailResult.ok
-        if (!mailResult.ok) {
-          console.warn('[orders] invoice email skipped:', mailResult.reason)
-        }
-      } catch (mailError) {
-        console.error('[orders] invoice email error:', mailError)
-      }
+        .catch((mailError) => {
+          console.error('[orders] invoice email error:', mailError)
+        })
     }
 
     if (!isOnline) {
@@ -242,7 +247,8 @@ export async function POST(request: NextRequest) {
             method: PAYMENT_METHODS.COD,
             status: PAYMENT_STATUS.UNPAID,
           },
-          invoiceEmailSent,
+          invoiceEmailSent: false,
+          invoiceEmailQueued,
         },
         { status: 201 }
       )
@@ -341,7 +347,7 @@ export async function POST(request: NextRequest) {
           status: PAYMENT_STATUS.PENDING,
           gatewayUrl,
         },
-        invoiceEmailSent,
+        invoiceEmailQueued,
       },
       { status: 201 }
     )

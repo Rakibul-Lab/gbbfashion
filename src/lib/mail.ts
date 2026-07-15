@@ -30,6 +30,10 @@ function createTransport() {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    // Prevent checkout from hanging forever on bad SMTP (common on shared hosts)
+    connectionTimeout: 8_000,
+    greetingTimeout: 8_000,
+    socketTimeout: 12_000,
   }
 
   // Typical shared hosting / cPanel: allow self-signed if explicitly enabled

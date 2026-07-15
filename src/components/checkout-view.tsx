@@ -200,8 +200,13 @@ export function CheckoutView() {
       setOrderId(order.id)
       clearCart()
       setView('confirmation')
+      setLoading(false)
       if (data.invoiceEmailSent) {
         toast.success('Order placed — invoice emailed to you')
+      } else if (data.invoiceEmailQueued && form.customerEmail.trim()) {
+        toast.success(
+          user ? 'Order placed — invoice will be emailed shortly' : 'Order placed — invoice will be emailed shortly'
+        )
       } else if (form.customerEmail.trim()) {
         toast.success(
           user ? 'Order placed — profile updated' : 'Order placed successfully'
