@@ -1,42 +1,88 @@
 'use client'
 
-import { useEffect, ReactNode } from 'react'
-import { useStore } from '@/lib/store'
-import { ViewType } from '@/lib/store'
+import { useEffect, type ReactNode } from 'react'
+import { useSession } from 'next-auth/react'
+import { useStore, type ViewType } from '@/lib/store'
 
 interface AuthGuardProps {
   children: ReactNode
-  /** Views that require authentication. If the user is not authenticated and tries to access these views, they'll be redirected to login. */
   protectedViews?: ViewType[]
-  /** Views that should redirect away if user is already authenticated. If the user is authenticated and tries to access these views, they'll be redirected. */
   guestOnlyViews?: ViewType[]
-  /** Where to redirect authenticated users trying to access guest-only views */
-  authenticatedRedirect?: ViewType
+}
+
+/** Keeps Zustand user in sync with NextAuth session (survives refresh). */
+function useHydrateUserFromSession() {
+  const { data: session, status } = useSession()
+  const setUser = useStore((s) => s.setUser)
+  const user = useStore((s) => s.user)
+
+  useEffect(() => {
+    if (status === 'loading') return
+
+    if (status === 'authenticated' && session?.user) {
+      const next = {
+        id: session.user.id,
+        name: session.user.name || '',
+        email: session.user.email || '',
+        role: session.user.role || 'customer',
+      }
+      if (
+        !user ||
+        user.id !== next.id ||
+        user.name !== next.name ||
+        user.email !== next.email ||
+        user.role !== next.role
+      ) {
+        setUser(next)
+      }
+      return
+    }
+
+    if (status === 'unauthenticated' && user) {
+      setUser(null)
+    }
+  }, [session, status, setUser, user])
 }
 
 export function AuthGuard({
   children,
-  protectedViews = ['checkout', 'admin'],
+  protectedViews = ['admin', 'account'],
   guestOnlyViews = ['login', 'signup'],
-  authenticatedRedirect = 'home',
 }: AuthGuardProps) {
-  const { view, user, setView } = useStore()
+  const { status } = useSession()
+  const { view, user, setView, setPostLoginView, consumePostLoginView } = useStore()
+  useHydrateUserFromSession()
 
   useEffect(() => {
-    // If user is not authenticated and trying to access a protected view
-    if (!user && protectedViews.includes(view)) {
-      setView('login')
+    // Wait for NextAuth before enforcing redirects (avoids bounce to home/login on refresh)
+    if (status === 'loading') return
+
+    if (status === 'unauthenticated' && protectedViews.includes(view)) {
+      setPostLoginView(view)
+      setView('login', { replace: true })
+      return
     }
 
-    // If user is authenticated and trying to access a guest-only view
-    if (user && guestOnlyViews.includes(view)) {
+    if (status === 'authenticated' && user && guestOnlyViews.includes(view)) {
+      const pending = consumePostLoginView()
       if (user.role === 'admin') {
-        setView('admin')
+        setView('admin', { replace: true })
+      } else if (pending && pending !== 'login' && pending !== 'signup') {
+        setView(pending, { replace: true })
       } else {
-        setView(authenticatedRedirect)
+        setView('account', { replace: true })
       }
     }
-  }, [view, user, setView, protectedViews, guestOnlyViews, authenticatedRedirect])
+  }, [
+    status,
+    view,
+    user,
+    setView,
+    setPostLoginView,
+    consumePostLoginView,
+    protectedViews,
+    guestOnlyViews,
+  ])
 
   return <>{children}</>
 }

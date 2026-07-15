@@ -2,19 +2,35 @@
 
 import { useState } from 'react'
 import { useStore } from '@/lib/store'
+import { useShopNavigation } from '@/hooks/use-shop-navigation'
+import { useStoreCommerce } from '@/hooks/use-store-commerce'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Instagram, Facebook, Twitter, Send } from 'lucide-react'
+import { Instagram, Facebook, Send } from 'lucide-react'
 import { motion } from 'framer-motion'
 
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .56.04.82.12V9.01a6.27 6.27 0 0 0-.82-.05A6.34 6.34 0 0 0 3.15 15.3a6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.77a8.18 8.18 0 0 0 4.76 1.52V6.84a4.85 4.85 0 0 1-1-.15z" />
+    </svg>
+  )
+}
+
 export function Footer() {
-  const { setView, setCategoryFilter } = useStore()
+  const { setView } = useStore()
+  const { goToShop, goHome } = useShopNavigation()
+  const { facebookUrl, instagramUrl, tiktokUrl } = useStoreCommerce()
   const [email, setEmail] = useState('')
   const [subscribed, setSubscribed] = useState(false)
 
   const handleCategoryClick = (category: string) => {
-    setCategoryFilter(category)
-    setView('shop')
+    goToShop({ category })
   }
 
   const handleSubscribe = (e: React.FormEvent) => {
@@ -34,7 +50,7 @@ export function Footer() {
           {/* Column 1: Brand Info */}
           <div>
             <button
-              onClick={() => setView('home')}
+              onClick={goHome}
               className="mb-5 hover:opacity-70 transition-opacity"
             >
               <span className="text-2xl">
@@ -45,29 +61,43 @@ export function Footer() {
             <p className="text-sm text-slate-400 leading-relaxed mb-6 max-w-xs">
               Premium leather bags, shoes, and accessories crafted with care. Elevate your everyday style with our curated collection of Bangladeshi fashion essentials.
             </p>
-            <div className="flex items-center gap-3">
-              <a
-                href="#"
-                className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-rose-600 hover:text-white transition-colors duration-300"
-                aria-label="Instagram"
-              >
-                <Instagram className="h-4 w-4" />
-              </a>
-              <a
-                href="#"
-                className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-rose-600 hover:text-white transition-colors duration-300"
-                aria-label="Facebook"
-              >
-                <Facebook className="h-4 w-4" />
-              </a>
-              <a
-                href="#"
-                className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-rose-600 hover:text-white transition-colors duration-300"
-                aria-label="Twitter"
-              >
-                <Twitter className="h-4 w-4" />
-              </a>
-            </div>
+            {(instagramUrl || facebookUrl || tiktokUrl) && (
+              <div className="flex items-center gap-3">
+                {instagramUrl ? (
+                  <a
+                    href={instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-rose-600 hover:text-white transition-colors duration-300"
+                    aria-label="Instagram"
+                  >
+                    <Instagram className="h-4 w-4" />
+                  </a>
+                ) : null}
+                {facebookUrl ? (
+                  <a
+                    href={facebookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-rose-600 hover:text-white transition-colors duration-300"
+                    aria-label="Facebook"
+                  >
+                    <Facebook className="h-4 w-4" />
+                  </a>
+                ) : null}
+                {tiktokUrl ? (
+                  <a
+                    href={tiktokUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-rose-600 hover:text-white transition-colors duration-300"
+                    aria-label="TikTok"
+                  >
+                    <TikTokIcon className="h-4 w-4" />
+                  </a>
+                ) : null}
+              </div>
+            )}
           </div>
 
           {/* Column 2: Quick Links */}
@@ -76,6 +106,22 @@ export function Footer() {
               Quick Links
             </h3>
             <ul className="space-y-3">
+              <li>
+                <button
+                  onClick={() => handleCategoryClick('new-arrivals')}
+                  className="text-sm text-slate-400 hover:text-white transition-colors duration-200"
+                >
+                  New Arrivals
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => handleCategoryClick('prime-drop')}
+                  className="text-sm text-rose-400 hover:text-rose-300 transition-colors duration-200 font-medium"
+                >
+                  Prime Drop
+                </button>
+              </li>
               <li>
                 <button
                   onClick={() => handleCategoryClick('women')}
@@ -166,9 +212,6 @@ export function Footer() {
             <h3 className="text-[11px] font-bold text-white uppercase tracking-[0.2em] mb-5">
               Subscribe to Our Newsletter
             </h3>
-            <p className="text-sm text-slate-400 mb-4 leading-relaxed">
-              Get 10% off your first order
-            </p>
             <form onSubmit={handleSubscribe} className="space-y-3">
               <div className="flex gap-2">
                 <Input
@@ -207,28 +250,12 @@ export function Footer() {
 
       {/* Bottom Bar */}
       <div className="border-t border-slate-800">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            {/* Copyright */}
-            <p className="text-xs text-slate-500">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 space-y-3">
+          <div className="flex flex-col sm:flex-row flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-slate-500 order-1 sm:order-none">
               &copy; {new Date().getFullYear()} GBB Fashion. All rights reserved.
             </p>
-
-            {/* Payment Methods */}
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider border border-slate-700 rounded px-2 py-0.5">
-                Visa
-              </span>
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider border border-slate-700 rounded px-2 py-0.5">
-                Mastercard
-              </span>
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider border border-slate-700 rounded px-2 py-0.5 bg-slate-800">
-                bKash
-              </span>
-            </div>
-
-            {/* Policy Links */}
-            <div className="flex items-center gap-4 text-xs text-slate-500">
+            <div className="flex items-center gap-4 text-xs text-slate-500 order-3 sm:order-none">
               <span className="hover:text-white cursor-pointer transition-colors duration-200">
                 Privacy Policy
               </span>
@@ -237,6 +264,10 @@ export function Footer() {
               </span>
             </div>
           </div>
+          <p className="text-xs text-slate-500 text-center">
+            Developed by:{' '}
+            <span className="text-slate-400">Ahanaf Adud &amp; Rakibul Hassan</span>
+          </p>
         </div>
       </div>
     </footer>

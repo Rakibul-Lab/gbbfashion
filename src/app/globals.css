@@ -129,3 +129,57 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Fluid product image aspect (shorter on small screens via utilities) */
+:root {
+  --product-image-aspect: 3 / 4;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --product-image-aspect: 2 / 3;
+  }
+}
+
+/* Force media to fill its parent box */
+.media-fill {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Media frames: any uploaded image fills the container completely */
+.media-frame,
+.product-image-frame,
+.product-thumb-frame {
+  position: relative;
+  overflow: hidden;
+}
+
+.product-image-frame {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #f1f5f9;
+}
+
+.media-frame > img,
+.media-frame img,
+.product-image-frame img,
+.product-thumb-frame img {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: fill !important;
+  object-position: center !important;
+}
+
+/* Prevent horizontal page overflow without breaking position:sticky */
+html,
+body {
+  overflow-x: clip;
+  max-width: 100vw;
+}

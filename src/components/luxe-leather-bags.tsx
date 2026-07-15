@@ -1,11 +1,14 @@
 'use client'
 
-import { useStore } from '@/lib/store'
+import { useShopNavigation } from '@/hooks/use-shop-navigation'
+import { useSectionMedia } from '@/hooks/use-section-media'
+import { SectionMediaFill } from '@/components/section-media'
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 
 export function LuxeLeatherBags() {
-  const { setView, setCategoryFilter } = useStore()
+  const { goToShop } = useShopNavigation()
+  const { get } = useSectionMedia()
 
   return (
     <section className="relative w-full bg-black overflow-hidden">
@@ -28,7 +31,7 @@ export function LuxeLeatherBags() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-60px' }}
               transition={{ duration: 0.8, ease: 'easeOut' }}
-              className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-light tracking-wide text-white leading-[1.05]"
+              className="text-3xl sm:text-6xl lg:text-7xl xl:text-8xl font-light tracking-wide text-white leading-[1.05]"
               style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
             >
               <span className="italic">Luxe Leather</span>
@@ -40,7 +43,7 @@ export function LuxeLeatherBags() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-60px' }}
               transition={{ duration: 0.8, delay: 0.15, ease: 'easeOut' }}
-              className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-wide text-amber-400 leading-[1.05] mt-1"
+              className="text-3xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-wide text-amber-400 leading-[1.05] mt-1"
               style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
             >
               Bags
@@ -86,10 +89,7 @@ export function LuxeLeatherBags() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-60px' }}
               transition={{ duration: 0.6, delay: 0.7, ease: 'easeOut' }}
-              onClick={() => {
-                setCategoryFilter('Bags')
-                setView('shop')
-              }}
+              onClick={() => goToShop({ category: 'women' })}
               className="group inline-flex items-center justify-center gap-2.5 border border-white text-white px-8 sm:px-10 py-3.5 sm:py-4 text-sm font-semibold tracking-wider uppercase mt-8 hover:bg-white hover:text-black transition-all duration-300 active:scale-[0.97]"
             >
               Explore Collection
@@ -105,13 +105,13 @@ export function LuxeLeatherBags() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-60px' }}
             transition={{ duration: 0.9, delay: 0.2, ease: 'easeOut' }}
-            className="relative w-full h-[50vh] md:h-full min-h-[350px] md:min-h-[70vh]"
+            className="relative w-full h-[40dvh] sm:h-[50vh] md:h-full min-h-[240px] sm:min-h-[350px] md:min-h-[70vh]"
           >
             {/* Image */}
-            <img
-              src="/luxe-leather-bags.jpg"
+            <SectionMediaFill
+              media={get('luxe_leather')}
               alt="Woman holding a premium brown leather bag from the Luxe Leather collection"
-              className="w-full h-full object-cover object-center"
+              fit="fill"
             />
 
             {/* Warm amber vignette on image */}

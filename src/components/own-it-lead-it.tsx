@@ -1,17 +1,19 @@
 'use client'
 
 import { useStore } from '@/lib/store'
+import { useSectionMedia } from '@/hooks/use-section-media'
+import { SectionMediaFill } from '@/components/section-media'
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 
 export function OwnItLeadIt() {
   const { setView } = useStore()
+  const { get } = useSectionMedia()
 
   return (
     <section className="w-full bg-[#FAFAF8] py-16 sm:py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row items-center gap-10 md:gap-12 lg:gap-16">
-          {/* Left Column — Image */}
           <motion.div
             initial={{ opacity: 0, x: -40 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -19,13 +21,12 @@ export function OwnItLeadIt() {
             transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="w-full md:w-[58%] flex-shrink-0"
           >
-            <div className="relative overflow-hidden rounded-sm">
-              <img
-                src="/own-it-lead-it.jpg"
+            <div className="relative overflow-hidden rounded-sm aspect-[4/3]">
+              <SectionMediaFill
+                media={get('own_it_lead_it')}
                 alt="Woman with handbags — Own It, Lead It"
-                className="w-full h-auto object-cover aspect-[4/3]"
+                fit="fill"
               />
-              {/* Subtle bottom gradient for depth */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent pointer-events-none" />
             </div>
           </motion.div>

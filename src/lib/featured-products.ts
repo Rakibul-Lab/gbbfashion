@@ -38,10 +38,10 @@ export const featuredProducts: FeaturedProduct[] = [
     collection: 'bags',
     colors: [
       { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/crossbody-bag.png' },
-      { name: 'Brown', swatch: '#8B5E3C', thumbnail: '/products/featured/crossbody-bag.png' },
-      { name: 'Dark Brown', swatch: '#5C3D2E', thumbnail: '/products/featured/crossbody-bag.png' },
-      { name: 'Light Coffee', swatch: '#C4A882', thumbnail: '/products/featured/crossbody-bag.png' },
-      { name: 'Red', swatch: '#B22222', thumbnail: '/products/featured/crossbody-bag.png' },
+      { name: 'Brown', swatch: '#8B5E3C', thumbnail: '/products/featured/shoulder-bag.png' },
+      { name: 'Dark Brown', swatch: '#5C3D2E', thumbnail: '/products/featured/butterfly-bag.png' },
+      { name: 'Light Coffee', swatch: '#C4A882', thumbnail: '/products/featured/twill-bag.png' },
+      { name: 'Red', swatch: '#B22222', thumbnail: '/products/featured/dumpling-bag.png' },
     ],
   },
   {
@@ -58,11 +58,11 @@ export const featuredProducts: FeaturedProduct[] = [
     hasFlash: false,
     collection: 'bags',
     colors: [
-      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/smart-wallet.png' },
-      { name: 'Blue', swatch: '#2E5090', thumbnail: '/products/featured/smart-wallet.png' },
+      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/cosmetic-bag.png' },
+      { name: 'Blue', swatch: '#2E5090', thumbnail: '/products/featured/duffle-bag.png' },
       { name: 'Brown', swatch: '#8B5E3C', thumbnail: '/products/featured/smart-wallet.png' },
-      { name: 'Carbon Fiber', swatch: '#3a3a3a', thumbnail: '/products/featured/smart-wallet.png' },
-      { name: 'Coffee', swatch: '#6F4E37', thumbnail: '/products/featured/smart-wallet.png' },
+      { name: 'Carbon Fiber', swatch: '#3a3a3a', thumbnail: '/products/featured/crossbody-bag.png' },
+      { name: 'Coffee', swatch: '#6F4E37', thumbnail: '/products/featured/shoulder-bag.png' },
     ],
   },
   {
@@ -79,9 +79,9 @@ export const featuredProducts: FeaturedProduct[] = [
     hasFlash: true,
     collection: 'bags',
     colors: [
-      { name: 'Black Elephant', swatch: '#1a1a1a', thumbnail: '/products/featured/shoulder-bag.png' },
-      { name: 'Brown Elephant', swatch: '#8B5E3C', thumbnail: '/products/featured/shoulder-bag.png' },
-      { name: 'Off White', swatch: '#F5F0EB', thumbnail: '/products/featured/shoulder-bag.png' },
+      { name: 'Black Elephant', swatch: '#1a1a1a', thumbnail: '/products/featured/butterfly-bag.png' },
+      { name: 'Brown Elephant', swatch: '#8B5E3C', thumbnail: '/products/featured/twill-bag.png' },
+      { name: 'Off White', swatch: '#F5F0EB', thumbnail: '/products/featured/dumpling-bag.png' },
     ],
   },
   {
@@ -98,10 +98,10 @@ export const featuredProducts: FeaturedProduct[] = [
     hasFlash: true,
     collection: 'bags',
     colors: [
-      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/butterfly-bag.png' },
-      { name: 'Pink', swatch: '#E8A0BF', thumbnail: '/products/featured/butterfly-bag.png' },
-      { name: 'Silver', swatch: '#C0C0C0', thumbnail: '/products/featured/butterfly-bag.png' },
-      { name: 'White', swatch: '#F5F5F5', thumbnail: '/products/featured/butterfly-bag.png' },
+      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/cosmetic-bag.png' },
+      { name: 'Pink', swatch: '#E8A0BF', thumbnail: '/products/featured/duffle-bag.png' },
+      { name: 'Silver', swatch: '#C0C0C0', thumbnail: '/products/featured/smart-wallet.png' },
+      { name: 'White', swatch: '#F5F5F5', thumbnail: '/products/featured/crossbody-bag.png' },
     ],
   },
   {
@@ -118,11 +118,11 @@ export const featuredProducts: FeaturedProduct[] = [
     hasFlash: true,
     collection: 'bags',
     colors: [
-      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/duffle-bag.png' },
-      { name: 'Blue', swatch: '#2E5090', thumbnail: '/products/featured/duffle-bag.png' },
-      { name: 'Green', swatch: '#4A7C59', thumbnail: '/products/featured/duffle-bag.png' },
-      { name: 'Pink', swatch: '#E8A0BF', thumbnail: '/products/featured/duffle-bag.png' },
-      { name: 'White', swatch: '#F5F5F5', thumbnail: '/products/featured/duffle-bag.png' },
+      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/shoulder-bag.png' },
+      { name: 'Blue', swatch: '#2E5090', thumbnail: '/products/featured/butterfly-bag.png' },
+      { name: 'Green', swatch: '#4A7C59', thumbnail: '/products/featured/twill-bag.png' },
+      { name: 'Pink', swatch: '#E8A0BF', thumbnail: '/products/featured/dumpling-bag.png' },
+      { name: 'White', swatch: '#F5F5F5', thumbnail: '/products/featured/cosmetic-bag.png' },
     ],
   },
   {
@@ -139,9 +139,9 @@ export const featuredProducts: FeaturedProduct[] = [
     hasFlash: false,
     collection: 'bags',
     colors: [
-      { name: 'Classic Black', swatch: '#1a1a1a', thumbnail: '/products/featured/cosmetic-bag.png' },
-      { name: 'Milky White', swatch: '#F5F0EB', thumbnail: '/products/featured/cosmetic-bag.png' },
-      { name: 'Mocha Brown', swatch: '#6F4E37', thumbnail: '/products/featured/cosmetic-bag.png' },
+      { name: 'Classic Black', swatch: '#1a1a1a', thumbnail: '/products/featured/duffle-bag.png' },
+      { name: 'Milky White', swatch: '#F5F0EB', thumbnail: '/products/featured/smart-wallet.png' },
+      { name: 'Mocha Brown', swatch: '#6F4E37', thumbnail: '/products/featured/crossbody-bag.png' },
     ],
   },
   {
@@ -158,10 +158,10 @@ export const featuredProducts: FeaturedProduct[] = [
     hasFlash: true,
     collection: 'bags',
     colors: [
-      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/twill-bag.png' },
-      { name: 'Grey', swatch: '#9CA3AF', thumbnail: '/products/featured/twill-bag.png' },
+      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/shoulder-bag.png' },
+      { name: 'Grey', swatch: '#9CA3AF', thumbnail: '/products/featured/butterfly-bag.png' },
       { name: 'Pink', swatch: '#E8A0BF', thumbnail: '/products/featured/twill-bag.png' },
-      { name: 'White', swatch: '#F5F5F5', thumbnail: '/products/featured/twill-bag.png' },
+      { name: 'White', swatch: '#F5F5F5', thumbnail: '/products/featured/dumpling-bag.png' },
     ],
   },
   {
@@ -178,8 +178,8 @@ export const featuredProducts: FeaturedProduct[] = [
     hasFlash: true,
     collection: 'bags',
     colors: [
-      { name: 'Khaki', swatch: '#C3B091', thumbnail: '/products/featured/dumpling-bag.png' },
-      { name: 'White', swatch: '#F5F5F5', thumbnail: '/products/featured/dumpling-bag.png' },
+      { name: 'Khaki', swatch: '#C3B091', thumbnail: '/products/featured/cosmetic-bag.png' },
+      { name: 'White', swatch: '#F5F5F5', thumbnail: '/products/featured/duffle-bag.png' },
     ],
   },
 
@@ -199,9 +199,9 @@ export const featuredProducts: FeaturedProduct[] = [
     collection: 'shoes',
     priceFrom: true,
     colors: [
-      { name: 'Beige', swatch: '#D4B896', thumbnail: '/products/featured/fashion-loafers.png' },
+      { name: 'Beige', swatch: '#D4B896', thumbnail: '/products/featured/british-loafers.png' },
       { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/fashion-loafers.png' },
-      { name: 'Deep Blue', swatch: '#1E3A5F', thumbnail: '/products/featured/fashion-loafers.png' },
+      { name: 'Deep Blue', swatch: '#1E3A5F', thumbnail: '/products/featured/casual-sneakers.png' },
     ],
   },
   {
@@ -218,9 +218,9 @@ export const featuredProducts: FeaturedProduct[] = [
     hasFlash: true,
     collection: 'shoes',
     colors: [
-      { name: 'Beige', swatch: '#D4B896', thumbnail: '/products/featured/casual-sneakers.png' },
-      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/casual-sneakers.png' },
-      { name: 'Green', swatch: '#4A7C59', thumbnail: '/products/featured/casual-sneakers.png' },
+      { name: 'Beige', swatch: '#D4B896', thumbnail: '/products/featured/suede-loafers.png' },
+      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/moccasin-loafers.png' },
+      { name: 'Green', swatch: '#4A7C59', thumbnail: '/products/featured/runner-shoes.png' },
     ],
   },
   {
@@ -237,9 +237,9 @@ export const featuredProducts: FeaturedProduct[] = [
     hasFlash: true,
     collection: 'shoes',
     colors: [
-      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/suede-loafers.png' },
-      { name: 'Blue', swatch: '#2E5090', thumbnail: '/products/featured/suede-loafers.png' },
-      { name: 'Khaki', swatch: '#C3B091', thumbnail: '/products/featured/suede-loafers.png' },
+      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/fisherman-loafers.png' },
+      { name: 'Blue', swatch: '#2E5090', thumbnail: '/products/featured/urban-sneakers.png' },
+      { name: 'Khaki', swatch: '#C3B091', thumbnail: '/products/featured/british-loafers.png' },
     ],
   },
   {
@@ -256,9 +256,9 @@ export const featuredProducts: FeaturedProduct[] = [
     hasFlash: true,
     collection: 'shoes',
     colors: [
-      { name: 'Brown', swatch: '#8B5E3C', thumbnail: '/products/featured/moccasin-loafers.png' },
-      { name: 'Coffee Brown', swatch: '#6F4E37', thumbnail: '/products/featured/moccasin-loafers.png' },
-      { name: 'Light Gray', swatch: '#9CA3AF', thumbnail: '/products/featured/moccasin-loafers.png' },
+      { name: 'Brown', swatch: '#8B5E3C', thumbnail: '/products/featured/fashion-loafers.png' },
+      { name: 'Coffee Brown', swatch: '#6F4E37', thumbnail: '/products/featured/casual-sneakers.png' },
+      { name: 'Light Gray', swatch: '#9CA3AF', thumbnail: '/products/featured/suede-loafers.png' },
       { name: 'Sand', swatch: '#D4B896', thumbnail: '/products/featured/moccasin-loafers.png' },
     ],
   },
@@ -277,9 +277,9 @@ export const featuredProducts: FeaturedProduct[] = [
     collection: 'shoes',
     colors: [
       { name: 'White/Black', swatch: '#E8E8E8', thumbnail: '/products/featured/runner-shoes.png' },
-      { name: 'White/Black Strips', swatch: '#D0D0D0', thumbnail: '/products/featured/runner-shoes.png' },
-      { name: 'White/Grey', swatch: '#C8C8C8', thumbnail: '/products/featured/runner-shoes.png' },
-      { name: 'White/Grey Strips', swatch: '#B8B8B8', thumbnail: '/products/featured/runner-shoes.png' },
+      { name: 'White/Black Strips', swatch: '#D0D0D0', thumbnail: '/products/featured/fisherman-loafers.png' },
+      { name: 'White/Grey', swatch: '#C8C8C8', thumbnail: '/products/featured/urban-sneakers.png' },
+      { name: 'White/Grey Strips', swatch: '#B8B8B8', thumbnail: '/products/featured/british-loafers.png' },
     ],
   },
   {
@@ -297,8 +297,8 @@ export const featuredProducts: FeaturedProduct[] = [
     collection: 'shoes',
     priceFrom: true,
     colors: [
-      { name: 'Beige', swatch: '#D4B896', thumbnail: '/products/featured/fisherman-loafers.png' },
-      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/fisherman-loafers.png' },
+      { name: 'Beige', swatch: '#D4B896', thumbnail: '/products/featured/fashion-loafers.png' },
+      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/casual-sneakers.png' },
     ],
   },
   {
@@ -315,8 +315,8 @@ export const featuredProducts: FeaturedProduct[] = [
     hasFlash: true,
     collection: 'shoes',
     colors: [
-      { name: 'Blue', swatch: '#2E5090', thumbnail: '/products/featured/urban-sneakers.png' },
-      { name: 'Green', swatch: '#4A7C59', thumbnail: '/products/featured/urban-sneakers.png' },
+      { name: 'Blue', swatch: '#2E5090', thumbnail: '/products/featured/suede-loafers.png' },
+      { name: 'Green', swatch: '#4A7C59', thumbnail: '/products/featured/moccasin-loafers.png' },
     ],
   },
   {
@@ -333,9 +333,9 @@ export const featuredProducts: FeaturedProduct[] = [
     hasFlash: true,
     collection: 'shoes',
     colors: [
-      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/british-loafers.png' },
-      { name: 'Brown', swatch: '#8B5E3C', thumbnail: '/products/featured/british-loafers.png' },
-      { name: 'Gray', swatch: '#9CA3AF', thumbnail: '/products/featured/british-loafers.png' },
+      { name: 'Black', swatch: '#1a1a1a', thumbnail: '/products/featured/runner-shoes.png' },
+      { name: 'Brown', swatch: '#8B5E3C', thumbnail: '/products/featured/fisherman-loafers.png' },
+      { name: 'Gray', swatch: '#9CA3AF', thumbnail: '/products/featured/urban-sneakers.png' },
     ],
   },
 ]

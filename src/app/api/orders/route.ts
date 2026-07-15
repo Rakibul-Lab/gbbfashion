@@ -1,8 +1,79 @@
-import { db } from '@/lib/db'
+import { getServerSession } from 'next-auth'
 import { NextRequest, NextResponse } from 'next/server'
+import { authOptions } from '@/lib/auth'
+import { db } from '@/lib/db'
+import { createUniqueOrderId } from '@/lib/order-id'
+import {
+  isPaymentMethod,
+  PAYMENT_METHODS,
+  PAYMENT_STATUS,
+  type PaymentMethod,
+} from '@/lib/payment'
+import {
+  buildProductName,
+  getAppBaseUrl,
+  initSslCommerzPayment,
+  resolveHostedGatewayUrl,
+} from '@/lib/sslcommerz'
+import { getSiteSettings } from '@/lib/site-settings'
+import { sendOrderInvoiceEmail } from '@/lib/order-invoice-mail'
 
-export async function GET() {
+type OrderItemInput = {
+  productId: string
+  productName: string
+  quantity: number
+  price: number
+}
+
+function parseItems(raw: unknown): OrderItemInput[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null
+  const items: OrderItemInput[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') return null
+    const row = item as Record<string, unknown>
+    const productId = typeof row.productId === 'string' ? row.productId : ''
+    const productName = typeof row.productName === 'string' ? row.productName : ''
+    const quantity = Number(row.quantity)
+    const price = Number(row.price)
+    if (!productId || !productName || !Number.isFinite(quantity) || quantity < 1) {
+      return null
+    }
+    if (!Number.isFinite(price) || price < 0) return null
+    items.push({ productId, productName, quantity: Math.floor(quantity), price })
+  }
+  return items
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const mine = searchParams.get('mine') === '1'
+
+    if (mine) {
+      const session = await getServerSession(authOptions)
+      if (!session?.user?.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+
+      const orders = await db.order.findMany({
+        where: {
+          OR: [
+            { userId: session.user.id },
+            ...(session.user.email
+              ? [{ customerEmail: session.user.email }]
+              : []),
+          ],
+        },
+        include: { items: true },
+        orderBy: { createdAt: 'desc' },
+      })
+      return NextResponse.json(orders)
+    }
+
     const orders = await db.order.findMany({
       include: { items: true },
       orderBy: { createdAt: 'desc' },
@@ -17,19 +88,95 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const session = await getServerSession(authOptions)
+
+    const customerName = String(body.customerName || '').trim()
+    const customerEmailRaw = String(body.customerEmail || '').trim()
+    const customerPhone = String(body.customerPhone || '').trim()
+    const shippingAddress = String(body.shippingAddress || '').trim()
+    const city = String(body.city || '').trim()
+    const state = String(body.state || '').trim()
+    const zipCode = String(body.zipCode || '').trim()
+    const items = parseItems(body.items)
+
+    if (
+      !customerName ||
+      !customerPhone ||
+      !shippingAddress ||
+      !city ||
+      !state ||
+      !items
+    ) {
+      return NextResponse.json({ error: 'Missing required order fields' }, { status: 400 })
+    }
+
+    if (customerEmailRaw && !isValidEmail(customerEmailRaw)) {
+      return NextResponse.json({ error: 'Invalid email address' }, { status: 400 })
+    }
+
+    const emailNormalized = customerEmailRaw ? customerEmailRaw.toLowerCase() : ''
+
+    if (session?.user?.id && emailNormalized) {
+      const existingUser = await db.user.findUnique({
+        where: { id: session.user.id },
+        select: { email: true },
+      })
+      if (existingUser && emailNormalized !== existingUser.email.toLowerCase()) {
+        const taken = await db.user.findUnique({
+          where: { email: emailNormalized },
+          select: { id: true },
+        })
+        if (taken && taken.id !== session.user.id) {
+          return NextResponse.json(
+            { error: 'That email is already used by another account' },
+            { status: 409 }
+          )
+        }
+      }
+    }
+
+    const paymentMethod: PaymentMethod = isPaymentMethod(body.paymentMethod)
+      ? body.paymentMethod
+      : PAYMENT_METHODS.COD
+
+    const settings = await getSiteSettings()
+    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const shipping =
+      subtotal >= settings.freeDeliveryMin ? 0 : settings.deliveryCharge
+    const totalAmount = Math.round((subtotal + shipping) * 100) / 100
+
+    const clientTotal = Number(body.totalAmount)
+    if (
+      Number.isFinite(clientTotal) &&
+      Math.abs(clientTotal - totalAmount) > 1
+    ) {
+      console.warn('Order total mismatch (using server total)', {
+        clientTotal,
+        totalAmount,
+      })
+    }
+
+    const orderId = await createUniqueOrderId()
+    const isOnline = paymentMethod === PAYMENT_METHODS.SSLCOMMERZ
 
     const order = await db.order.create({
       data: {
-        customerName: body.customerName,
-        customerEmail: body.customerEmail,
-        customerPhone: body.customerPhone,
-        shippingAddress: body.shippingAddress,
-        city: body.city,
-        state: body.state,
-        zipCode: body.zipCode,
-        totalAmount: body.totalAmount,
+        id: orderId,
+        userId: session?.user?.id ?? null,
+        customerName,
+        customerEmail: emailNormalized,
+        customerPhone,
+        shippingAddress,
+        city,
+        state,
+        zipCode,
+        totalAmount,
+        status: 'pending',
+        paymentMethod,
+        paymentStatus: isOnline ? PAYMENT_STATUS.PENDING : PAYMENT_STATUS.UNPAID,
+        transactionId: isOnline ? orderId : null,
         items: {
-          create: body.items.map((item: { productId: string; productName: string; quantity: number; price: number }) => ({
+          create: items.map((item) => ({
             productId: item.productId,
             productName: item.productName,
             quantity: item.quantity,
@@ -40,9 +187,166 @@ export async function POST(request: NextRequest) {
       include: { items: true },
     })
 
-    return NextResponse.json(order, { status: 201 })
+    if (session?.user?.id) {
+      await db.user.update({
+        where: { id: session.user.id },
+        data: {
+          name: customerName,
+          ...(emailNormalized ? { email: emailNormalized } : {}),
+          phone: customerPhone || null,
+          shippingAddress: shippingAddress || null,
+          city: city || null,
+          state: state || null,
+          zipCode: zipCode || null,
+        },
+      })
+    }
+
+    let invoiceEmailSent = false
+    if (emailNormalized) {
+      try {
+        const mailResult = await sendOrderInvoiceEmail({
+          id: order.id,
+          customerName: order.customerName,
+          customerEmail: order.customerEmail,
+          customerPhone: order.customerPhone,
+          shippingAddress: order.shippingAddress,
+          city: order.city,
+          state: order.state,
+          zipCode: order.zipCode,
+          totalAmount: order.totalAmount,
+          status: order.status,
+          paymentMethod: order.paymentMethod,
+          paymentStatus: order.paymentStatus,
+          createdAt: order.createdAt,
+          items: order.items.map((item) => ({
+            productName: item.productName,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+        })
+        invoiceEmailSent = mailResult.ok
+        if (!mailResult.ok) {
+          console.warn('[orders] invoice email skipped:', mailResult.reason)
+        }
+      } catch (mailError) {
+        console.error('[orders] invoice email error:', mailError)
+      }
+    }
+
+    if (!isOnline) {
+      return NextResponse.json(
+        {
+          order,
+          payment: {
+            method: PAYMENT_METHODS.COD,
+            status: PAYMENT_STATUS.UNPAID,
+          },
+          invoiceEmailSent,
+        },
+        { status: 201 }
+      )
+    }
+
+    const baseUrl = getAppBaseUrl(request.url)
+    const sslPayload = {
+      total_amount: totalAmount,
+      currency: 'BDT',
+      tran_id: order.id,
+      success_url: `${baseUrl}/api/payments/sslcommerz/success`,
+      fail_url: `${baseUrl}/api/payments/sslcommerz/fail`,
+      cancel_url: `${baseUrl}/api/payments/sslcommerz/cancel`,
+      ipn_url: `${baseUrl}/api/payments/sslcommerz/ipn`,
+      shipping_method: 'Courier',
+      num_of_item: order.items.reduce((n, i) => n + i.quantity, 0) || 1,
+      product_name: buildProductName(order.items),
+      product_category: 'fashion',
+      product_profile: 'general',
+      cus_name: customerName,
+      cus_email: emailNormalized || 'guest@gbbfashion.com',
+      cus_add1: shippingAddress,
+      cus_city: city,
+      cus_state: state,
+      cus_postcode: zipCode,
+      cus_country: 'Bangladesh',
+      cus_phone: customerPhone,
+      ship_name: customerName,
+      ship_add1: shippingAddress,
+      ship_city: city,
+      ship_state: state,
+      ship_postcode: zipCode,
+      ship_country: 'Bangladesh',
+      value_a: order.id,
+      value_b: paymentMethod,
+    }
+
+    let gatewayUrl: string | undefined
+    try {
+      const sslRes = await initSslCommerzPayment(sslPayload)
+      gatewayUrl = resolveHostedGatewayUrl(sslRes)
+
+      if (!gatewayUrl || (sslRes.status || '').toUpperCase() !== 'SUCCESS') {
+        console.error('SSLCommerz init failed:', sslRes)
+        await db.order.update({
+          where: { id: order.id },
+          data: {
+            paymentStatus: PAYMENT_STATUS.FAILED,
+            status: 'cancelled',
+            paymentMeta: JSON.stringify(sslRes),
+          },
+        })
+        return NextResponse.json(
+          {
+            error:
+              sslRes.failedreason ||
+              'Could not initialize SSLCommerz payment session',
+            orderId: order.id,
+          },
+          { status: 502 }
+        )
+      }
+
+      await db.order.update({
+        where: { id: order.id },
+        data: {
+          paymentMeta: JSON.stringify({
+            sessionkey: sslRes.sessionkey,
+            GatewayPageURL: gatewayUrl,
+          }),
+        },
+      })
+    } catch (error) {
+      console.error('SSLCommerz init exception:', error)
+      await db.order.update({
+        where: { id: order.id },
+        data: {
+          paymentStatus: PAYMENT_STATUS.FAILED,
+          status: 'cancelled',
+          paymentMeta: JSON.stringify({
+            error: error instanceof Error ? error.message : 'init failed',
+          }),
+        },
+      })
+      return NextResponse.json(
+        { error: 'Payment gateway unavailable', orderId: order.id },
+        { status: 502 }
+      )
+    }
+
+    return NextResponse.json(
+      {
+        order,
+        payment: {
+          method: PAYMENT_METHODS.SSLCOMMERZ,
+          status: PAYMENT_STATUS.PENDING,
+          gatewayUrl,
+        },
+        invoiceEmailSent,
+      },
+      { status: 201 }
+    )
   } catch (error) {
-    console.error('Order POST error:', error)
+    console.error('Orders POST error:', error)
     return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
   }
 }

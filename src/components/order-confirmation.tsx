@@ -1,11 +1,16 @@
 'use client'
 
 import { useStore } from '@/lib/store'
+import { useCurrency } from '@/hooks/use-currency'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { motion } from 'framer-motion'
 import { CheckCircle, Package, ArrowRight } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import {
+  paymentMethodLabel,
+  paymentStatusLabel,
+} from '@/lib/payment'
 
 interface OrderData {
   id: string
@@ -13,6 +18,9 @@ interface OrderData {
   customerEmail: string
   totalAmount: number
   status: string
+  paymentMethod?: string
+  paymentStatus?: string
+  sslCardType?: string | null
   items: Array<{
     id: string
     productName: string
@@ -23,8 +31,14 @@ interface OrderData {
 }
 
 export function OrderConfirmation() {
-  const { orderId, setView } = useStore()
+  const { orderId, setView, clearCart } = useStore()
+  const { format } = useCurrency()
   const [order, setOrder] = useState<OrderData | null>(null)
+
+  useEffect(() => {
+    // Online payments land here after gateway redirect — clear cart once
+    clearCart()
+  }, [clearCart])
 
   useEffect(() => {
     if (orderId) {
@@ -35,6 +49,9 @@ export function OrderConfirmation() {
     }
   }, [orderId])
 
+  const isCod = order?.paymentMethod === 'cod'
+  const isPaid = order?.paymentStatus === 'paid'
+
   return (
     <section className="py-16 sm:py-24 bg-white min-h-[60vh]">
       <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8">
@@ -44,7 +61,6 @@ export function OrderConfirmation() {
           transition={{ duration: 0.5 }}
           className="text-center"
         >
-          {/* Success animation */}
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -60,7 +76,7 @@ export function OrderConfirmation() {
             transition={{ delay: 0.3 }}
             className="text-3xl font-bold text-slate-900"
           >
-            Order Confirmed!
+            {isPaid ? 'Payment successful!' : 'Order confirmed!'}
           </motion.h1>
 
           <motion.p
@@ -69,7 +85,11 @@ export function OrderConfirmation() {
             transition={{ delay: 0.4 }}
             className="mt-2 text-slate-500"
           >
-            Thank you for your purchase. We&apos;ll send you a confirmation email shortly.
+            {isCod
+              ? 'Thank you! Please keep cash ready for delivery.'
+              : isPaid
+                ? 'Your payment was received securely.'
+                : 'Thank you for your purchase.'}
           </motion.p>
         </motion.div>
 
@@ -105,6 +125,19 @@ export function OrderConfirmation() {
                     <span className="text-slate-700">{order.customerEmail}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-slate-500">Payment</span>
+                    <span className="text-slate-700">
+                      {paymentMethodLabel(order.paymentMethod)} ·{' '}
+                      {paymentStatusLabel(order.paymentStatus)}
+                    </span>
+                  </div>
+                  {order.sslCardType ? (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Paid via</span>
+                      <span className="text-slate-700">{order.sslCardType}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between">
                     <span className="text-slate-500">Date</span>
                     <span className="text-slate-700">
                       {new Date(order.createdAt).toLocaleDateString('en-US', {
@@ -126,7 +159,7 @@ export function OrderConfirmation() {
                         {item.productName} x{item.quantity}
                       </span>
                       <span className="font-medium text-slate-700">
-                        ${(item.price * item.quantity).toLocaleString()}
+                        {format(item.price * item.quantity)}
                       </span>
                     </div>
                   ))}
@@ -137,7 +170,7 @@ export function OrderConfirmation() {
                 <div className="flex justify-between">
                   <span className="text-lg font-semibold text-slate-900">Total</span>
                   <span className="text-lg font-bold text-amber-700">
-                    ${order.totalAmount.toLocaleString()}
+                    {format(order.totalAmount)}
                   </span>
                 </div>
               </CardContent>

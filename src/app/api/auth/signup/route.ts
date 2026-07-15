@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     // Determine role: admin for specific email, customer otherwise
     const role = email.toLowerCase() === 'admin@gbb.com' ? 'admin' : 'customer'
 
-    // Create user
+    // Create user (self-registered customer)
     const user = await db.user.create({
       data: {
         name,
@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
         password: hashedPassword,
         phone: phone || null,
         role,
+        source: 'signup',
       },
     })
 

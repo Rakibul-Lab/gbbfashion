@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { normalizeStock } from '@/lib/stock'
 
 export async function GET(request: Request) {
   try {
@@ -32,20 +33,25 @@ export async function POST(request: Request) {
       videoSrc,
       videoThumbnail,
       thumbnail,
+      stock,
       colors,
       isActive,
       sortOrder,
     } = body
 
-    if (!title || !productName || !price || !videoSrc) {
+    if (!title || !productName || price === undefined || price === null || !videoSrc) {
       return NextResponse.json(
         { error: 'Title, product name, price, and video source are required' },
         { status: 400 }
       )
     }
 
-    // TODO: Add admin check once middleware is in place
-    // For now, anyone can create reels (admin only in production)
+    if (!thumbnail) {
+      return NextResponse.json(
+        { error: 'Product image is required' },
+        { status: 400 }
+      )
+    }
 
     const reel = await db.reel.create({
       data: {
@@ -54,8 +60,9 @@ export async function POST(request: Request) {
         price,
         originalPrice: originalPrice || null,
         videoSrc,
-        videoThumbnail: videoThumbnail || '',
+        videoThumbnail: videoThumbnail || thumbnail || '',
         thumbnail: thumbnail || '',
+        stock: normalizeStock(stock, 0),
         colors: colors || null,
         isActive: isActive !== undefined ? isActive : true,
         sortOrder: sortOrder || 0,

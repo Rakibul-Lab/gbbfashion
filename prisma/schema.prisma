@@ -3,41 +3,99 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id            String   @id @default(cuid())
-  name          String
-  email         String   @unique
-  password      String
-  role          String   @default("customer")
-  phone         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  orders        Order[]
+  id              String   @id @default(cuid())
+  name            String
+  email           String   @unique
+  password        String
+  role            String   @default("customer")
+  /** signup = self-registered customer | admin = created from admin panel */
+  source          String   @default("signup")
+  phone           String?
+  shippingAddress String?  @db.Text
+  city            String?
+  state           String?
+  zipCode         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  orders          Order[]
+}
+
+model Category {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  label           String
+  highlight       Boolean       @default(false)
+  showInNav       Boolean       @default(true)
+  sortOrder       Int           @default(0)
+  /** Special shop modes: new-arrivals | prime-drop | null for normal categories */
+  specialType     String?
+  heroTitle       String?
+  heroSubtitle    String?
+  heroDescription String?       @db.Text
+  heroImageLeft   String?
+  heroImageRight  String?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  subcategories   SubCategory[]
+}
+
+model SubCategory {
+  id             String   @id @default(cuid())
+  categoryId     String
+  slug           String
+  label          String
+  sortOrder      Int      @default(0)
+  heroImageLeft  String?
+  heroImageRight String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  category       Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, slug])
+  @@index([categoryId])
 }
 
 model Product {
-  id            String   @id @default(cuid())
-  name          String
-  description   String
-  price         Float
-  originalPrice Float?
-  category      String
-  image         String
+  id             String      @id @default(cuid())
+  name           String
+  description    String      @db.Text
+  price          Float
+  originalPrice  Float?
+  category       String
+  /** Subcategory slug within category — managed from admin */
+  subCategory    String?
+  image          String
   secondaryImage String?
-  features      String
-  rating        Float    @default(4.5)
-  inStock       Boolean  @default(true)
-  badge         String?
-  colors        String?
-  collection    String?
-  hasFlash      Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  orderItems    OrderItem[]
+  /** JSON: [{ name, swatch, image }] — color gallery used on storefront swatches */
+  galleryImages  String?     @db.Text
+  features       String      @db.Text
+  rating         Float       @default(4.5)
+  /** Units available — inStock is derived as stock > 0 */
+  stock          Int         @default(100)
+  inStock        Boolean     @default(true)
+  badge          String?
+  colors         String?     @db.Text
+  collection     String?
+  hasFlash       Boolean     @default(false)
+  /** Homepage / shop placements — controlled from admin */
+  isNewArrival   Boolean     @default(false)
+  isPrimeDrop    Boolean     @default(false)
+  isFeatured     Boolean     @default(false)
+  sortOrder      Int         @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  orderItems     OrderItem[]
+
+  @@index([category])
+  @@index([isNewArrival])
+  @@index([isPrimeDrop])
 }
 
 model Order {
@@ -46,16 +104,33 @@ model Order {
   customerName    String
   customerEmail   String
   customerPhone   String
-  shippingAddress String
+  shippingAddress String      @db.Text
   city            String
   state           String
   zipCode         String
   totalAmount     Float
+  /** Order fulfillment: pending | processing | shipped | delivered | cancelled */
   status          String      @default("pending")
+  /** Payment channel: cod | sslcommerz */
+  paymentMethod   String      @default("cod")
+  /** unpaid | pending | paid | failed | cancelled */
+  paymentStatus   String      @default("unpaid")
+  /** SSLCommerz tran_id (usually same as order id) */
+  transactionId   String?
+  sslValId        String?
+  sslBankTranId   String?
+  sslCardType     String?
+  paidAt          DateTime?
+  /** JSON snapshot of gateway validation / IPN payload (sanitized summary) */
+  paymentMeta     String?     @db.Text
   items           OrderItem[]
   user            User?       @relation(fields: [userId], references: [id])
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+
+  @@index([paymentStatus])
+  @@index([paymentMethod])
+  @@index([transactionId])
 }
 
 model OrderItem {
@@ -70,17 +145,20 @@ model OrderItem {
 }
 
 model Reel {
-  id              String   @id @default(cuid())
-  title           String
-  productName     String
-  price           Float
-  originalPrice   Float?
-  videoSrc        String
-  videoThumbnail  String
-  thumbnail       String
-  colors          String?
-  isActive        Boolean  @default(true)
-  sortOrder       Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  title          String
+  productName    String
+  price          Float
+  originalPrice  Float?
+  videoSrc       String
+  videoThumbnail String
+  thumbnail      String
+  /** Units available for the reel product */
+  stock          Int      @default(50)
+  /** JSON: [{ name, hex, image }] color / image variants for the reel product */
+  colors         String?  @db.Text
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

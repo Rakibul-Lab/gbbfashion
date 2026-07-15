@@ -436,10 +436,21 @@ export async function POST() {
     })
 
     // Seed products
-    const createdProducts = await db.product.createMany({ data: products })
+    const createdProducts = await db.product.createMany({
+      data: products.map((p) => ({
+        ...p,
+        stock: 100,
+        inStock: true,
+      })),
+    })
 
     // Seed reels
-    const createdReels = await db.reel.createMany({ data: reels })
+    const createdReels = await db.reel.createMany({
+      data: reels.map((r) => ({
+        ...r,
+        stock: 50,
+      })),
+    })
 
     return NextResponse.json({
       message: 'Database seeded successfully',

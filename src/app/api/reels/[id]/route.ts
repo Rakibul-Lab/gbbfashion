@@ -1,8 +1,9 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { normalizeStock } from '@/lib/stock'
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -52,6 +53,7 @@ export async function PUT(
         ...(body.videoSrc !== undefined && { videoSrc: body.videoSrc }),
         ...(body.videoThumbnail !== undefined && { videoThumbnail: body.videoThumbnail }),
         ...(body.thumbnail !== undefined && { thumbnail: body.thumbnail }),
+        ...(body.stock !== undefined && { stock: normalizeStock(body.stock, 0) }),
         ...(body.colors !== undefined && { colors: body.colors }),
         ...(body.isActive !== undefined && { isActive: body.isActive }),
         ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
@@ -69,7 +71,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

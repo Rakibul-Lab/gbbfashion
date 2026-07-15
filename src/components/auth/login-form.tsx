@@ -15,6 +15,7 @@ import {
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
+import { signIn } from 'next-auth/react'
 
 export function LoginForm() {
   const { setView, setUser } = useStore()
@@ -41,10 +42,11 @@ export function LoginForm() {
     setLoading(true)
 
     try {
+      const normalizedEmail = email.trim().toLowerCase()
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       })
 
       const data = await res.json()
@@ -54,7 +56,19 @@ export function LoginForm() {
         return
       }
 
-      // Store user info in Zustand
+      // Create NextAuth session (needed for protected API routes like logo upload)
+      const authResult = await signIn('credentials', {
+        email: normalizedEmail,
+        password,
+        redirect: false,
+      })
+
+      if (authResult?.error) {
+        setError('Login succeeded but session could not be created. Please try again.')
+        return
+      }
+
+      // Store user info in Zustand — AuthGuard routes using postLoginView
       setUser({
         id: data.id,
         name: data.name,
@@ -63,13 +77,6 @@ export function LoginForm() {
       })
 
       toast.success(`Welcome back, ${data.name}!`)
-
-      // Navigate based on role
-      if (data.role === 'admin') {
-        setView('admin')
-      } else {
-        setView('home')
-      }
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {

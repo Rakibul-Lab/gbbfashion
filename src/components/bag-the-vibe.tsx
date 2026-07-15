@@ -1,12 +1,17 @@
 'use client'
 
-import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { useStore } from '@/lib/store'
+import { useCurrency } from '@/hooks/use-currency'
+import { useSectionMedia } from '@/hooks/use-section-media'
+import { SectionMediaFill } from '@/components/section-media'
+import { productImageContainerClass } from '@/lib/product-image'
 import { ArrowRight } from 'lucide-react'
 
 export function BagTheVibe() {
   const { setView, selectProduct } = useStore()
+  const { format } = useCurrency()
+  const { get } = useSectionMedia()
 
   const handleViewProduct = () => {
     selectProduct('butterfly-design-shoulder-bag')
@@ -16,7 +21,6 @@ export function BagTheVibe() {
   return (
     <section className="w-full py-16 md:py-24 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Heading */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -30,9 +34,7 @@ export function BagTheVibe() {
           <div className="mt-4 mx-auto w-16 h-0.5 bg-slate-900" />
         </motion.div>
 
-        {/* 2-Column Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          {/* Left Column — Lifestyle Image */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -40,32 +42,20 @@ export function BagTheVibe() {
             transition={{ duration: 0.7, ease: 'easeOut', delay: 0.1 }}
             className="relative aspect-[3/4] overflow-hidden rounded-sm group cursor-pointer"
           >
-            <Image
-              src="/bag-the-vibe.jpg"
+            <SectionMediaFill
+              media={get('bag_the_vibe')}
               alt="Woman with a stylish handbag — lifestyle"
-              fill
-              className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-              sizes="(max-width: 768px) 100vw, 50vw"
+              fit="cover"
               priority
             />
-            {/* Dark gradient overlay at bottom */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-
-            {/* Text overlay */}
             <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-                className="text-white/90 text-sm md:text-base tracking-wider uppercase font-medium"
-              >
+              <p className="text-white/90 text-sm md:text-base tracking-wider uppercase font-medium">
                 Style that speaks before you do
-              </motion.p>
+              </p>
             </div>
           </motion.div>
 
-          {/* Right Column — Product Display */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -73,73 +63,40 @@ export function BagTheVibe() {
             transition={{ duration: 0.7, ease: 'easeOut', delay: 0.2 }}
             className="flex flex-col items-center justify-center bg-slate-50 rounded-sm p-6 md:p-10 group"
           >
-            {/* TRENDING Badge */}
-            <motion.span
-              initial={{ opacity: 0, scale: 0.8 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: 0.3 }}
-              className="inline-block bg-black text-white text-[10px] md:text-xs font-bold tracking-widest uppercase px-4 py-1.5 mb-6"
-            >
+            <span className="inline-block bg-black text-white text-[10px] md:text-xs font-bold tracking-widest uppercase px-4 py-1.5 mb-6">
               TRENDING
-            </motion.span>
+            </span>
 
-            {/* Product Image */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.35 }}
-              className="relative w-full max-w-[320px] aspect-square mb-6 overflow-hidden"
+            <div
+              className={`relative w-full max-w-[200px] sm:max-w-[220px] mx-auto ${productImageContainerClass} mb-6`}
             >
-              <Image
-                src="/products/featured/butterfly-bag.png"
+              <SectionMediaFill
+                media={get('bag_the_vibe_product')}
                 alt="Butterfly Design Shoulder Bag"
-                fill
-                className="object-contain transition-transform duration-500 ease-out group-hover:scale-105"
-                sizes="(max-width: 768px) 280px, 320px"
+                fit="fill"
               />
-            </motion.div>
+            </div>
 
-            {/* Product Name */}
-            <motion.h3
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.45 }}
-              className="text-base md:text-lg font-semibold text-slate-900 text-center mb-2"
-            >
+            <h3 className="text-base md:text-lg font-semibold text-slate-900 text-center mb-2">
               Butterfly Design Shoulder Bag
-            </motion.h3>
+            </h3>
 
-            {/* Price */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.5 }}
-              className="flex items-center gap-3 mb-6"
-            >
+            <div className="flex items-center gap-3 mb-6">
               <span className="text-xl md:text-2xl font-bold text-slate-900">
-                ৳1,025
+                {format(1025)}
               </span>
               <span className="text-sm md:text-base text-slate-400 line-through">
-                ৳2,562
+                {format(2562)}
               </span>
-            </motion.div>
+            </div>
 
-            {/* VIEW PRODUCT Button */}
-            <motion.button
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.55 }}
+            <button
               onClick={handleViewProduct}
               className="group/btn flex items-center gap-2 bg-black text-white text-xs md:text-sm font-semibold tracking-widest uppercase px-8 py-3.5 transition-all duration-300 hover:bg-slate-800 hover:gap-3"
             >
               VIEW PRODUCT
               <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover/btn:translate-x-1" />
-            </motion.button>
+            </button>
           </motion.div>
         </div>
       </div>

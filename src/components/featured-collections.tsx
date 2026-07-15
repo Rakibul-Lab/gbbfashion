@@ -2,9 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Zap, Star } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Zap } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { featuredProducts, type FeaturedProduct, type ColorVariant } from '@/lib/featured-products'
+import { productCardWidthClass, productImageContainerClass, productImageFitClass, PRODUCT_CAROUSEL_SCROLL } from '@/lib/product-image'
+import { AddToCartPlus } from '@/components/add-to-cart-plus'
+import { useShopNavigation } from '@/hooks/use-shop-navigation'
+import { useCurrency } from '@/hooks/use-currency'
 
 type CollectionTab = 'bags' | 'shoes'
 
@@ -12,56 +16,6 @@ const tabs: { value: CollectionTab; label: string }[] = [
   { value: 'bags', label: 'Prime Bags' },
   { value: 'shoes', label: 'Prime Shoes' },
 ]
-
-// Custom Star Rating matching thepatchee.com style
-function StarRating({ rating, reviewCount }: { rating: number; reviewCount: number }) {
-  const fullStars = Math.floor(rating)
-  const hasHalf = rating - fullStars >= 0.3
-
-  return (
-    <div className="flex items-center gap-1.5 mt-2">
-      <div className="flex items-center" role="img" aria-label={`${rating} out of 5.0 stars`}>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <svg
-            key={star}
-            aria-hidden="true"
-            focusable="false"
-            width="12"
-            height="11"
-            viewBox="0 0 12 11"
-            className="inline-block"
-          >
-            {star <= fullStars ? (
-              <path
-                d="M6 0v8.635L2.292 11 3.48 6.87 0 4.202l4.443-.187L6 0Zm0 0v8.635L9.708 11 8.52 6.87 12 4.202l-4.443-.187L6 0Z"
-                fill="#c9a66b"
-              />
-            ) : star === fullStars + 1 && hasHalf ? (
-              <>
-                <path
-                  d="M6 0v8.635L2.292 11 3.48 6.87 0 4.202l4.443-.187L6 0Z"
-                  fill="#c9a66b"
-                />
-                <path
-                  d="M6 0v8.635L9.708 11 8.52 6.87 12 4.202l-4.443-.187L6 0Z"
-                  fillOpacity="0.4"
-                  fill="#c9a66b"
-                />
-              </>
-            ) : (
-              <path
-                d="M6 0v8.635L2.292 11 3.48 6.87 0 4.202l4.443-.187L6 0Zm0 0v8.635L9.708 11 8.52 6.87 12 4.202l-4.443-.187L6 0Z"
-                fillOpacity="0.4"
-                fill="#c9a66b"
-              />
-            )}
-          </svg>
-        ))}
-      </div>
-      <span className="text-[10px] tracking-wide text-slate-400 uppercase">({rating})</span>
-    </div>
-  )
-}
 
 // Color swatch component
 function ColorSwatches({ colors, selectedColor, onColorSelect }: { colors: ColorVariant[]; selectedColor: number; onColorSelect: (index: number) => void }) {
@@ -71,7 +25,10 @@ function ColorSwatches({ colors, selectedColor, onColorSelect }: { colors: Color
       {colors.map((color, index) => (
         <button
           key={color.name}
-          onClick={() => onColorSelect(index)}
+          onClick={(e) => {
+            e.stopPropagation()
+            onColorSelect(index)
+          }}
           className={`relative rounded-full transition-all duration-200 ${
             selectedColor === index
               ? 'ring-2 ring-offset-1 ring-slate-900 scale-110'
@@ -109,14 +66,22 @@ function ColorSwatches({ colors, selectedColor, onColorSelect }: { colors: Color
 function ProductCard({ product, index }: { product: FeaturedProduct; index: number }) {
   const [selectedColor, setSelectedColor] = useState(0)
   const [isHovered, setIsHovered] = useState(false)
-  const [imageLoaded, setImageLoaded] = useState(false)
+  const { openProduct } = useShopNavigation()
+  const { format } = useCurrency()
+
+  const activeColor = product.colors[selectedColor] ?? product.colors[0]
+  const displayImage = activeColor?.thumbnail || product.image
+  const hoverImage = product.secondaryImage || product.image
+  // Only use hover swap when viewing the default color (so color picks stay visible)
+  const showHoverSwap = isHovered && selectedColor === 0 && hoverImage !== displayImage
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.05, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="snap-start shrink-0 w-[220px] sm:w-[240px] md:w-[260px] lg:w-[calc((100vw-96px)/5-16px)] min-w-[200px]"
+      className={`snap-start ${productCardWidthClass} cursor-pointer`}
+      onClick={() => void openProduct({ id: product.id, name: product.name })}
     >
       <div
         className="group relative"
@@ -124,26 +89,26 @@ function ProductCard({ product, index }: { product: FeaturedProduct; index: numb
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* Image Container */}
-        <div className="relative aspect-square overflow-hidden bg-slate-50 rounded-sm">
-          {/* Primary Image */}
+        <div className={`${productImageContainerClass} rounded-sm`}>
           <img
-            src={product.image}
-            alt={product.name}
-            className={`w-full h-full object-cover transition-opacity duration-500 ${
-              isHovered ? 'opacity-0' : 'opacity-100'
-            }`}
-            loading="lazy"
-            onLoad={() => setImageLoaded(true)}
-          />
-          {/* Secondary Image (on hover) */}
-          <img
-            src={product.secondaryImage}
-            alt={product.name}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
-              isHovered ? 'opacity-100' : 'opacity-0'
+            key={displayImage}
+            src={displayImage}
+            alt={`${product.name}${activeColor ? ` — ${activeColor.name}` : ''}`}
+            className={`w-full h-full ${productImageFitClass} transition-opacity duration-300 ${
+              showHoverSwap ? 'opacity-0' : 'opacity-100'
             }`}
             loading="lazy"
           />
+          {selectedColor === 0 && (
+            <img
+              src={hoverImage}
+              alt={product.name}
+              className={`absolute inset-0 w-full h-full ${productImageFitClass} transition-opacity duration-300 ${
+                showHoverSwap ? 'opacity-100' : 'opacity-0'
+              }`}
+              loading="lazy"
+            />
+          )}
 
           {/* Trending Badge - Top Left */}
           <div className="absolute top-2 left-2">
@@ -157,42 +122,46 @@ function ProductCard({ product, index }: { product: FeaturedProduct; index: numb
             <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold tracking-wide text-white bg-rose-600 rounded-sm leading-tight">
               Save {product.discountPercent}%
             </span>
-            {/* Flash Delivery Badge */}
             {product.hasFlash && (
               <div className="flex items-center justify-center w-5 h-5 bg-amber-400 rounded-full">
                 <Zap className="w-3 h-3 text-amber-900 fill-amber-900" />
               </div>
             )}
           </div>
+
+          <div className="absolute bottom-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+            <AddToCartPlus
+              productId={product.id}
+              name={product.name}
+              price={product.price}
+              image={displayImage}
+            />
+          </div>
         </div>
 
         {/* Product Info */}
         <div className="pt-3 pb-1">
           <div className="flex flex-col items-center gap-1.5">
-            {/* Title */}
-            <h3 className="text-sm font-semibold text-slate-900 text-center line-clamp-1 leading-tight">
+            <h3 className="text-sm font-semibold text-slate-900 text-center line-clamp-2 leading-tight px-1">
               {product.name}
             </h3>
 
-            {/* Price */}
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-rose-600">
-                {product.priceFrom && 'From '}৳ {product.price.toLocaleString()}
+                {product.priceFrom && 'From '}{format(product.price)}
               </span>
               <span className="text-sm text-slate-400 line-through">
-                ৳ {product.originalPrice.toLocaleString()}
+                {format(product.originalPrice)}
               </span>
             </div>
 
-            {/* Color Swatches */}
             <ColorSwatches
               colors={product.colors}
               selectedColor={selectedColor}
-              onColorSelect={setSelectedColor}
+              onColorSelect={(index) => {
+                setSelectedColor(index)
+              }}
             />
-
-            {/* Rating */}
-            <StarRating rating={product.rating} reviewCount={product.reviewCount} />
           </div>
         </div>
       </div>
@@ -238,7 +207,7 @@ export function FeaturedCollections() {
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
-      const scrollAmount = 480
+      const scrollAmount = PRODUCT_CAROUSEL_SCROLL
       scrollRef.current.scrollBy({
         left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth',
@@ -248,14 +217,14 @@ export function FeaturedCollections() {
 
   return (
     <section className="py-12 sm:py-16 lg:py-20 bg-white">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
         {/* Tab Navigation */}
-        <div className="flex items-center justify-center gap-6 sm:gap-10 mb-10 sm:mb-12">
+        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-10 mb-10 sm:mb-12">
           {tabs.map((tab) => (
             <button
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
-              className={`relative text-2xl sm:text-3xl lg:text-4xl tracking-tight transition-all duration-300 pb-2 ${
+              className={`relative text-lg sm:text-3xl lg:text-4xl tracking-tight transition-all duration-300 pb-2 ${
                 activeTab === tab.value
                   ? 'text-slate-900 font-bold'
                   : 'text-slate-300 font-medium hover:text-slate-500'
@@ -283,7 +252,7 @@ export function FeaturedCollections() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 onClick={() => scroll('left')}
-                className="absolute left-0 top-1/3 -translate-y-1/2 -translate-x-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white border border-slate-200 shadow-lg hover:shadow-xl hover:border-slate-300 transition-all text-slate-600 hover:text-slate-900"
+                className="absolute left-0 top-1/3 -translate-y-1/2 -translate-x-2 z-10 hidden sm:flex h-10 w-10 items-center justify-center rounded-full bg-white border border-slate-200 shadow-lg hover:shadow-xl hover:border-slate-300 transition-all text-slate-600 hover:text-slate-900"
                 aria-label="Previous"
               >
                 <ChevronLeft className="h-5 w-5" />
@@ -321,7 +290,7 @@ export function FeaturedCollections() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 onClick={() => scroll('right')}
-                className="absolute right-0 top-1/3 -translate-y-1/2 translate-x-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white border border-slate-200 shadow-lg hover:shadow-xl hover:border-slate-300 transition-all text-slate-600 hover:text-slate-900"
+                className="absolute right-0 top-1/3 -translate-y-1/2 translate-x-2 z-10 hidden sm:flex h-10 w-10 items-center justify-center rounded-full bg-white border border-slate-200 shadow-lg hover:shadow-xl hover:border-slate-300 transition-all text-slate-600 hover:text-slate-900"
                 aria-label="Next"
               >
                 <ChevronRight className="h-5 w-5" />

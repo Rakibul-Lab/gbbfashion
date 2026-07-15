@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { inStockFromQuantity, normalizeStock } from '@/lib/stock'
 
 export async function GET(
   _request: NextRequest,
@@ -13,7 +14,11 @@ export async function GET(
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    return NextResponse.json(product)
+    return NextResponse.json(product, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=900',
+      },
+    })
   } catch (error) {
     console.error('Product GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch product' }, { status: 500 })
@@ -27,6 +32,7 @@ export async function PUT(
   try {
     const { id } = await params
     const body = await request.json()
+    const stock = normalizeStock(body.stock, 0)
 
     const product = await db.product.update({
       where: { id },
@@ -38,13 +44,20 @@ export async function PUT(
         category: body.category,
         image: body.image,
         secondaryImage: body.secondaryImage ?? null,
+        galleryImages: body.galleryImages ?? null,
         features: body.features,
         rating: body.rating,
-        inStock: body.inStock,
+        stock,
+        inStock: inStockFromQuantity(stock),
         badge: body.badge ?? null,
         colors: body.colors ?? null,
         collection: body.collection ?? null,
         hasFlash: body.hasFlash ?? false,
+        subCategory: body.subCategory ?? null,
+        isNewArrival: body.isNewArrival ?? false,
+        isPrimeDrop: body.isPrimeDrop ?? false,
+        isFeatured: body.isFeatured ?? false,
+        sortOrder: body.sortOrder ?? 0,
       },
     })
 

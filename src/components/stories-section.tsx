@@ -1,8 +1,9 @@
 'use client'
 
 import { useStore } from '@/lib/store'
+import { useCurrency } from '@/hooks/use-currency'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShoppingBag, X, ChevronLeft, ChevronRight, Volume2, VolumeX, ChevronDown, Heart, Share2 } from 'lucide-react'
+import { ShoppingBag, X, ChevronLeft, ChevronRight, Volume2, VolumeX, ChevronDown, Heart, Share2, Play, Pause } from 'lucide-react'
 import { useState, useRef, useEffect, useCallback } from 'react'
 
 interface ReelProduct {
@@ -91,12 +92,15 @@ function ReelCard({
   product,
   index,
   onOpen,
+  forcePaused = false,
 }: {
   product: ReelProduct
   index: number
   onOpen: () => void
+  forcePaused?: boolean
 }) {
   const { addToCart } = useStore()
+  const { format } = useCurrency()
   const [showOverlay, setShowOverlay] = useState(false)
   const [isInViewport, setIsInViewport] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -117,17 +121,17 @@ function ReelCard({
     return () => observer.disconnect()
   }, [])
 
-  // Play/pause based on viewport visibility
+  // Play only when visible AND modal is not open; pause otherwise
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
-    if (isInViewport) {
-      video.play().catch(() => {})
-    } else {
+    if (forcePaused || !isInViewport) {
       video.pause()
+      return
     }
-  }, [isInViewport])
+    video.play().catch(() => {})
+  }, [isInViewport, forcePaused])
 
   const handleAddToCart = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -169,9 +173,8 @@ function ReelCard({
           poster={product.videoThumbnail}
           muted
           loop
-          autoPlay
           playsInline
-          className="w-full h-full object-cover"
+          className="w-full h-full object-fill"
         />
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
@@ -190,7 +193,7 @@ function ReelCard({
               <img
                 src={product.thumbnail}
                 alt={product.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-fill"
               />
             </div>
             <div className="flex-1 min-w-0">
@@ -199,11 +202,11 @@ function ReelCard({
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="text-white font-bold text-sm">
-                  ৳{product.price.toLocaleString()}
+                  {format(product.price)}
                 </span>
                 {product.originalPrice && (
                   <span className="text-white/50 text-[10px] line-through">
-                    ৳{product.originalPrice.toLocaleString()}
+                    {format(product.originalPrice)}
                   </span>
                 )}
               </div>
@@ -261,11 +264,13 @@ function ReelModal({
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [isMuted, setIsMuted] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(true)
   const [selectedColor, setSelectedColor] = useState(0)
   const [colorDropdownOpen, setColorDropdownOpen] = useState(false)
   const [addedToCart, setAddedToCart] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const { addToCart } = useStore()
+  const { format } = useCurrency()
 
   const product = products[currentIndex]
 
@@ -274,6 +279,7 @@ function ReelModal({
     setSelectedColor(0)
     setColorDropdownOpen(false)
     setAddedToCart(false)
+    setIsPlaying(true)
   }, [])
 
   // Autoplay video with sound when modal opens or index changes
@@ -282,7 +288,9 @@ function ReelModal({
     if (!video) return
     video.muted = isMuted
     video.currentTime = 0
-    video.play().catch(() => {})
+    video.play()
+      .then(() => setIsPlaying(true))
+      .catch(() => setIsPlaying(false))
   }, [currentIndex])
 
   // Sync mute state to video
@@ -291,6 +299,19 @@ function ReelModal({
     if (!video) return
     video.muted = isMuted
   }, [isMuted])
+
+  const togglePlayPause = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) {
+      video.play()
+        .then(() => setIsPlaying(true))
+        .catch(() => setIsPlaying(false))
+    } else {
+      video.pause()
+      setIsPlaying(false)
+    }
+  }, [])
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -314,10 +335,14 @@ function ReelModal({
       if (e.key === 'Escape') onClose()
       if (e.key === 'ArrowRight') goNext()
       if (e.key === 'ArrowLeft') goPrev()
+      if (e.key === ' ' || e.key === 'k') {
+        e.preventDefault()
+        togglePlayPause()
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose, goNext, goPrev])
+  }, [onClose, goNext, goPrev, togglePlayPause])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -378,21 +403,46 @@ function ReelModal({
       >
         {/* LEFT — Video Section */}
         <div className="relative sm:w-1/2 flex-shrink-0 bg-slate-900">
-          {/* Video */}
-          <video
-            ref={videoRef}
-            src={product.videoSrc}
-            poster={product.videoThumbnail}
-            muted={isMuted}
-            loop
-            autoPlay
-            playsInline
-            className="w-full h-64 sm:h-full object-cover"
-          />
+          {/* Video — click to play / pause */}
+          <button
+            type="button"
+            onClick={togglePlayPause}
+            className="relative block w-full h-64 sm:h-full cursor-pointer focus:outline-none"
+            aria-label={isPlaying ? 'Pause video' : 'Play video'}
+          >
+            <video
+              ref={videoRef}
+              src={product.videoSrc}
+              poster={product.videoThumbnail}
+              muted={isMuted}
+              loop
+              playsInline
+              className="w-full h-full object-fill pointer-events-none"
+            />
+
+            {/* Center play / pause hint */}
+            <span
+              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
+                isPlaying ? 'opacity-0 hover:opacity-100' : 'opacity-100'
+              }`}
+            >
+              <span className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center">
+                {isPlaying ? (
+                  <Pause className="w-6 h-6 fill-current" />
+                ) : (
+                  <Play className="w-6 h-6 fill-current ml-0.5" />
+                )}
+              </span>
+            </span>
+          </button>
 
           {/* Sound on/off toggle */}
           <button
-            onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted) }}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsMuted(!isMuted)
+            }}
             className="absolute bottom-4 left-4 z-20 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 flex items-center justify-center transition-colors"
           >
             {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
@@ -440,23 +490,23 @@ function ReelModal({
               <img
                 src={product.thumbnail}
                 alt={product.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-fill"
               />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xl font-bold text-slate-900">
-                  ৳{product.price.toLocaleString()}
+                  {format(product.price)}
                 </span>
                 {product.originalPrice && (
                   <span className="text-sm text-slate-400 line-through">
-                    ৳{product.originalPrice.toLocaleString()}
+                    {format(product.originalPrice)}
                   </span>
                 )}
               </div>
               {discount > 0 && (
                 <span className="text-xs font-semibold text-red-500">
-                  Save ৳{(product.originalPrice! - product.price).toLocaleString()} ({discount}% off)
+                  Save {format(product.originalPrice! - product.price)} ({discount}% off)
                 </span>
               )}
             </div>
@@ -616,6 +666,65 @@ function ReelModal({
 export function StoriesSection() {
   const [modalOpen, setModalOpen] = useState(false)
   const [modalIndex, setModalIndex] = useState(0)
+  const [products, setProducts] = useState<ReelProduct[]>(reelProducts)
+
+  useEffect(() => {
+    fetch('/api/reels?active=true', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!Array.isArray(data) || data.length === 0) return
+        const mapped: ReelProduct[] = data.map(
+          (reel: {
+            id: string
+            productName: string
+            title?: string
+            price: number
+            originalPrice?: number | null
+            thumbnail: string
+            videoThumbnail: string
+            videoSrc: string
+            colors?: string | null
+            stock?: number
+          }) => {
+            let colors: { name: string; hex: string }[] | undefined
+            if (reel.colors) {
+              try {
+                if (reel.colors.trim().startsWith('[')) {
+                  const parsed = JSON.parse(reel.colors) as {
+                    name?: string
+                    hex?: string
+                    swatch?: string
+                  }[]
+                  colors = parsed.map((c, i) => ({
+                    name: c.name || `Color ${i + 1}`,
+                    hex: c.hex || c.swatch || '#888888',
+                  }))
+                } else {
+                  colors = reel.colors.split(',').map((part, i) => ({
+                    name: `Color ${i + 1}`,
+                    hex: part.trim(),
+                  }))
+                }
+              } catch {
+                colors = undefined
+              }
+            }
+            return {
+              id: reel.id,
+              name: reel.productName || reel.title || 'Reel product',
+              price: reel.price,
+              originalPrice: reel.originalPrice ?? undefined,
+              thumbnail: reel.thumbnail,
+              videoThumbnail: reel.videoThumbnail || reel.thumbnail,
+              videoSrc: reel.videoSrc,
+              colors,
+            }
+          }
+        )
+        setProducts(mapped)
+      })
+      .catch(() => undefined)
+  }, [])
 
   const openModal = useCallback((index: number) => {
     setModalIndex(index)
@@ -626,46 +735,48 @@ export function StoriesSection() {
     setModalOpen(false)
   }, [])
 
+  if (products.length === 0) return null
+
   return (
     <>
-      <section className="py-12 sm:py-16 lg:py-20 bg-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          {/* Section Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-8 sm:mb-10"
-          >
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-[0.15em] text-slate-900">
-              STORIES THAT LEAD
-            </h2>
-            <div className="mt-3 mx-auto w-12 h-0.5 bg-amber-500" />
-            <p className="mt-3 text-slate-500 text-xs sm:text-sm max-w-md mx-auto tracking-wide">
-              Watch our latest reels and shop the look instantly
-            </p>
-          </motion.div>
+      <section className="w-full py-12 sm:py-16 lg:py-20 bg-white overflow-hidden">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-8 sm:mb-10 px-4"
+        >
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-[0.15em] text-slate-900">
+            STORIES THAT LEAD
+          </h2>
+          <div className="mt-3 mx-auto w-12 h-0.5 bg-amber-500" />
+          <p className="mt-3 text-slate-500 text-xs sm:text-sm max-w-md mx-auto tracking-wide">
+            Watch our latest reels and shop the look instantly
+          </p>
+        </motion.div>
 
-          {/* 5 Reels in full-width grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 sm:gap-5">
-            {reelProducts.map((product, index) => (
+        <div className="w-full flex gap-2 sm:gap-3 lg:gap-4 overflow-x-auto md:overflow-visible snap-x snap-mandatory pb-2 px-2 sm:px-3 lg:px-4 scrollbar-hide">
+          {products.map((product, index) => (
+            <div
+              key={product.id}
+              className="snap-start shrink-0 w-[42vw] max-w-[200px] sm:w-[170px] md:flex-1 md:w-0 md:min-w-0 md:max-w-none"
+            >
               <ReelCard
-                key={product.id}
                 product={product}
                 index={index}
                 onOpen={() => openModal(index)}
+                forcePaused={modalOpen}
               />
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Split-screen reel modal */}
       <AnimatePresence>
         {modalOpen && (
           <ReelModal
-            products={reelProducts}
+            products={products}
             initialIndex={modalIndex}
             onClose={closeModal}
           />

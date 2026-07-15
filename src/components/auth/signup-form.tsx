@@ -15,6 +15,7 @@ import {
 import { Mail, Lock, Eye, EyeOff, Loader2, User, Phone } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
+import { signIn } from 'next-auth/react'
 
 export function SignupForm() {
   const { setView, setUser } = useStore()
@@ -84,25 +85,37 @@ export function SignupForm() {
       const loginRes = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       })
 
       const loginData = await loginRes.json()
 
-      if (loginRes.ok) {
-        setUser({
-          id: loginData.id,
-          name: loginData.name,
-          email: loginData.email,
-          role: loginData.role,
-        })
-        toast.success('Account created successfully! Welcome to GBB Fashion!')
-        setView('home')
-      } else {
-        // Account created but auto-login failed - redirect to login
+      if (!loginRes.ok) {
         toast.success('Account created! Please sign in.')
         setView('login')
+        return
       }
+
+      const authResult = await signIn('credentials', {
+        email: email.trim().toLowerCase(),
+        password,
+        redirect: false,
+      })
+
+      if (authResult?.error) {
+        setError('Account created, but session could not start. Please sign in.')
+        setView('login')
+        return
+      }
+
+      setUser({
+        id: loginData.id,
+        name: loginData.name,
+        email: loginData.email,
+        role: loginData.role,
+      })
+      toast.success('Account created successfully! Welcome to GBB Fashion!')
+      // AuthGuard routes using postLoginView (e.g. back to cart)
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
