@@ -1,0 +1,14 @@
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/rrpdream/gbbfashion"
+PassengerBaseURI "/"
+PassengerNodejs "/usr/local/apps/nodejs20/bin/node"
+PassengerAppType node
+PassengerStartupFile server.js
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+
+# Optional: set secrets in cPanel Node App UI instead of putting passwords here.
+# Uncomment and fill if Passenger does not load .env:
+# PassengerEnvVar DATABASE_URL "mysql://USER:PASSWORD@127.0.0.1:3306/DB_NAME"
+# PassengerEnvVar NEXTAUTH_URL "https://gbbfashion.com"
+# PassengerEnvVar NEXT_PUBLIC_SITE_URL "https://gbbfashion.com"
+# PassengerEnvVar NEXTAUTH_SECRET "your-long-random-secret"

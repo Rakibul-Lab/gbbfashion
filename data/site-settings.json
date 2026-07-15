@@ -6,10 +6,13 @@
   "heroMediaUrl": "/hero-banner.jpg",
   "currencyCode": "BDT",
   "whatsappNumber": "8801335107218",
-  "whatsappIconId": "classic",
+  "whatsappIconId": "dark",
   "whatsappIconUrl": "",
   "freeDeliveryMin": 2000,
   "deliveryCharge": 100,
+  "facebookUrl": "https://www.facebook.com/GBBFashion",
+  "instagramUrl": "",
+  "tiktokUrl": "",
   "announcements": [
     "FREE SHIPPING ON ORDERS OVER ৳2,500",
     "CASH ON DELIVERY AVAILABLE",
@@ -21,6 +24,8 @@
       "title": "The Prime Drop",
       "subtitle": "UPTO 50% OFF",
       "image": "/banner-prime-drop.png",
+      "mediaType": "image",
+      "mediaUrl": "/banner-prime-drop.png",
       "ctaLabel": "Shop Now",
       "linkCategory": "prime-drop",
       "enabled": true
@@ -30,6 +35,8 @@
       "title": "New Arrivals",
       "subtitle": "Fresh styles just landed",
       "image": "/banner-new-arrivals.png",
+      "mediaType": "image",
+      "mediaUrl": "/banner-new-arrivals.png",
       "ctaLabel": "Explore",
       "linkCategory": "new-arrivals",
       "enabled": true
@@ -97,5 +104,107 @@
       "enabled": true
     }
   ],
-  "updatedAt": "2026-07-14T09:43:37.230Z"
+  "sectionMedia": {
+    "promo_prime": {
+      "type": "image",
+      "url": "/banner-prime-drop.png"
+    },
+    "promo_second": {
+      "type": "image",
+      "url": "/banner-luxe-leather.png"
+    },
+    "backpack_series_0": {
+      "type": "image",
+      "url": "/backpack-series.jpg"
+    },
+    "backpack_series_1": {
+      "type": "image",
+      "url": "/shoulder-bags-collection.jpg"
+    },
+    "backpack_series_2": {
+      "type": "image",
+      "url": "/handbags-collection.jpg"
+    },
+    "bag_the_vibe": {
+      "type": "image",
+      "url": "/bag-the-vibe.jpg"
+    },
+    "bag_the_vibe_product": {
+      "type": "image",
+      "url": "/products/featured/butterfly-bag.png"
+    },
+    "luxe_leather": {
+      "type": "image",
+      "url": "/luxe-leather-bags.jpg"
+    },
+    "own_it_lead_it": {
+      "type": "image",
+      "url": "/own-it-lead-it.jpg"
+    },
+    "shop_new_arrivals_left": {
+      "type": "image",
+      "url": "/products/women-shoulder-bag.png"
+    },
+    "shop_new_arrivals_right": {
+      "type": "image",
+      "url": "/products/men-shoes.png"
+    },
+    "shop_prime_drop_left": {
+      "type": "image",
+      "url": "/products/men-shoes.png"
+    },
+    "shop_prime_drop_right": {
+      "type": "image",
+      "url": "/products/women-hand-bag.png"
+    },
+    "shop_women_left": {
+      "type": "image",
+      "url": "/products/women-crossbody-bag.png"
+    },
+    "shop_women_right": {
+      "type": "image",
+      "url": "/products/women-hand-bag-2.png"
+    },
+    "shop_men_left": {
+      "type": "image",
+      "url": "/products/men-backpack.png"
+    },
+    "shop_men_right": {
+      "type": "image",
+      "url": "/products/men-long-wallet.png"
+    },
+    "shop_shoes_left": {
+      "type": "image",
+      "url": "/products/men-shoes.png"
+    },
+    "shop_shoes_right": {
+      "type": "image",
+      "url": "/products/women-shoes.png"
+    },
+    "shop_belt_left": {
+      "type": "image",
+      "url": "/products/men-long-wallet.png"
+    },
+    "shop_belt_right": {
+      "type": "image",
+      "url": "/products/women-hand-bag.png"
+    },
+    "shop_kids_left": {
+      "type": "image",
+      "url": "/products/women-mini-bag.png"
+    },
+    "shop_kids_right": {
+      "type": "image",
+      "url": "/products/men-backpack.png"
+    },
+    "shop_accessories_left": {
+      "type": "image",
+      "url": "/products/men-long-wallet.png"
+    },
+    "shop_accessories_right": {
+      "type": "image",
+      "url": "/products/women-mini-bag.png"
+    }
+  },
+  "updatedAt": "2026-07-15T08:08:04.108Z"
 }
