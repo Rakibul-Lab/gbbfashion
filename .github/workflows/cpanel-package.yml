@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   package:
@@ -65,28 +66,31 @@ jobs:
           node -e "const fs=require('fs'); const p='$PKG_DIR/package.json'; let pkg={}; try{pkg=JSON.parse(fs.readFileSync(p,'utf8'))}catch{}; pkg.name='gbbfashion'; pkg.private=true; pkg.scripts={...(pkg.scripts||{}), start:'node server.js'}; fs.writeFileSync(p, JSON.stringify(pkg,null,2));"
 
           cat > "$PKG_DIR/README-CPANEL.txt" <<'EOF'
-GBB Fashion — cPanel deploy package
-==================================
+          GBB Fashion - cPanel deploy package
+          ==================================
 
-1. Upload and extract this zip into your Node app directory
-   (e.g. /home/USER/gbbfashion or the app root cPanel assigns).
+          1. Upload and extract this zip into your Node app directory
+             (e.g. /home/USER/gbbfashion or the app root cPanel assigns).
 
-2. Copy .env.example to .env and fill in:
-   - DATABASE_URL
-   - NEXTAUTH_URL / NEXT_PUBLIC_SITE_URL (your live domain)
-   - NEXTAUTH_SECRET
-   - SSLCommerz + SMTP values
+          2. Copy .env.example to .env and fill in:
+             - DATABASE_URL
+             - NEXTAUTH_URL / NEXT_PUBLIC_SITE_URL (your live domain)
+             - NEXTAUTH_SECRET
+             - SSLCommerz + SMTP values
 
-3. In cPanel → Setup Node.js App:
-   - Application root: this folder
-   - Application startup file: server.js
-   - Node.js version: 20+
+          3. In cPanel > Setup Node.js App:
+             - Application root: this folder
+             - Application startup file: server.js
+             - Node.js version: 20+
 
-4. Push the Prisma schema to MySQL once (from your PC or SSH):
-   DATABASE_URL="mysql://..." npx prisma db push
+          4. Push the Prisma schema to MySQL once (from your PC or SSH):
+             DATABASE_URL="mysql://..." npx prisma db push
 
-5. Start / Restart the Node.js application in cPanel.
-EOF
+          5. Start / Restart the Node.js application in cPanel.
+          EOF
+
+          # Strip leading indent from README (YAML requires indented heredoc lines)
+          sed -i 's/^          //' "$PKG_DIR/README-CPANEL.txt"
 
           zip -r gbbfashion-cpanel.zip "$PKG_DIR"
 
