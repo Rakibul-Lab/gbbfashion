@@ -22,6 +22,7 @@ import { productThumbClass } from '@/lib/product-image'
 import { PAYMENT_METHODS } from '@/lib/payment'
 import { isValidBdMobile } from '@/lib/phone'
 import { FreeDeliveryProgress } from '@/components/free-delivery-progress'
+import { cartItemsToGtm, trackBeginCheckout } from '@/lib/gtm'
 
 interface CheckoutProfile {
   name: string
@@ -68,6 +69,13 @@ export function CheckoutView() {
 
   const [form, setForm] = useState<CheckoutForm>(emptyForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (cart.length === 0) return
+    trackBeginCheckout(cartItemsToGtm(cart), subtotal)
+    // Only on first mount / entering checkout — not on every cart/price recalculation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return

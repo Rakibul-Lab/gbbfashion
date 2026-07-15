@@ -11,6 +11,7 @@ import {
   paymentMethodLabel,
   paymentStatusLabel,
 } from '@/lib/payment'
+import { trackPurchase } from '@/lib/gtm'
 
 interface OrderData {
   id: string
@@ -44,7 +45,29 @@ export function OrderConfirmation() {
     if (orderId) {
       fetch(`/api/orders/${orderId}`)
         .then((res) => res.json())
-        .then((data) => setOrder(data))
+        .then((data) => {
+          if (!data || data.error || !data.id) return
+          setOrder(data)
+          trackPurchase({
+            transaction_id: data.id,
+            value: Number(data.totalAmount) || 0,
+            items: Array.isArray(data.items)
+              ? data.items.map(
+                  (item: {
+                    productId: string
+                    productName: string
+                    quantity: number
+                    price: number
+                  }) => ({
+                    item_id: item.productId,
+                    item_name: item.productName,
+                    price: item.price,
+                    quantity: item.quantity,
+                  })
+                )
+              : [],
+          })
+        })
         .catch(console.error)
     }
   }, [orderId])

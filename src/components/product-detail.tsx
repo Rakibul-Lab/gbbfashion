@@ -11,7 +11,6 @@ import { ProductColorSwatches } from '@/components/product-color-swatches'
 import {
   resolveProductColorVariants,
   resolveProductGallery,
-  cartLineKey,
   type ProductColorVariant,
 } from '@/lib/product-colors'
 import { Badge } from '@/components/ui/badge'
@@ -20,8 +19,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ShoppingCart, ArrowLeft, Check, ChevronLeft, ChevronRight, Zap } from 'lucide-react'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
+import { trackViewItem } from '@/lib/gtm'
 
 interface Product {
   id: string
@@ -58,6 +58,7 @@ export function ProductDetail() {
   const [notFound, setNotFound] = useState(false)
   const [selectedColor, setSelectedColor] = useState('')
   const [activeImage, setActiveImage] = useState('')
+  const lastViewedId = useRef<string | null>(null)
 
   useEffect(() => {
     if (!selectedProductId) {
@@ -84,6 +85,15 @@ export function ProductDetail() {
         const first = variants[0]
         setSelectedColor(first?.name || '')
         setActiveImage(first?.image || data.image)
+        if (lastViewedId.current !== data.id) {
+          lastViewedId.current = data.id
+          trackViewItem({
+            item_id: data.id,
+            item_name: data.name,
+            item_category: data.category,
+            price: data.price,
+          })
+        }
         if (data.category) {
           fetch(`/api/products?category=${data.category}`)
             .then((r) => r.json())
@@ -184,25 +194,17 @@ export function ProductDetail() {
   const addCurrentProductToCart = () => {
     const color = activeVariant?.name || selectedColor || null
     const image = displayImage
-    addToCart({
-      productId: product.id,
-      name: product.name,
-      price: product.price,
-      image,
-      color,
-      colorSwatch: activeVariant?.swatch || null,
-    })
-
-    if (quantity > 1) {
-      const { cart } = useStore.getState()
-      const key = cartLineKey(product.id, color)
-      const existing = cart.find((c) => cartLineKey(c.productId, c.color) === key)
-      if (existing) {
-        useStore
-          .getState()
-          .updateQuantity(product.id, existing.quantity + quantity - 1, color)
-      }
-    }
+    addToCart(
+      {
+        productId: product.id,
+        name: product.name,
+        price: product.price,
+        image,
+        color,
+        colorSwatch: activeVariant?.swatch || null,
+      },
+      quantity
+    )
 
     return color && color !== 'Default' ? `${product.name} (${color})` : product.name
   }
