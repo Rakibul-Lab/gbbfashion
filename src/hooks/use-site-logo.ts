@@ -56,6 +56,11 @@ export function useSiteLogo() {
     heroMediaUrl: DEFAULT_HERO_MEDIA_URL,
   })
 
+  // Prefer saved logo immediately (avoids flash of default while /api/settings loads)
+  useEffect(() => {
+    applyFavicon(branding.logoUrl)
+  }, [branding.logoUrl])
+
   useEffect(() => {
     let cancelled = false
 
@@ -81,7 +86,6 @@ export function useSiteLogo() {
           heroMediaUrl: data.heroMediaUrl || DEFAULT_HERO_MEDIA_URL,
         }
         setBranding(next)
-        // Defer past React commit so we never race head reconciliation
         queueMicrotask(() => {
           if (!cancelled) applyFavicon(next.logoUrl)
         })

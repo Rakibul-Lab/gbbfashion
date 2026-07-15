@@ -115,7 +115,7 @@ export function getOrganizationSchema() {
     '@type': 'Organization',
     name: siteConfig.name,
     url: siteConfig.url,
-    logo: absoluteUrl('/logo.svg'),
+    logo: absoluteUrl('/uploads/logo.png'),
     description: siteConfig.description,
     sameAs: [],
   }

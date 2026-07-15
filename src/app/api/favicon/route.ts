@@ -4,22 +4,30 @@ import path from 'path'
 import { getSiteSettings } from '@/lib/site-settings'
 import { mimeFromUrl } from '@/lib/site-settings-client'
 
-/** Serves the current site logo as the favicon (cache-busted). */
-export async function GET() {
+/** Serves the current site logo as the favicon (never falls back to a foreign brand mark first). */
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const preferred = searchParams.get('v')
+
     const settings = await getSiteSettings()
     const candidates = [
-      settings.logoUrl.split('?')[0],
+      preferred || '',
+      settings.logoUrl,
+      '/uploads/logo.png',
       '/logo.svg',
     ]
 
     for (const logoPath of candidates) {
-      const absolute = path.join(process.cwd(), 'public', logoPath.replace(/^\//, ''))
+      if (!logoPath) continue
+      const relative = logoPath.split('?')[0].replace(/^\//, '')
+      if (!relative || relative.includes('..')) continue
+      const absolute = path.join(process.cwd(), 'public', relative)
       try {
         const buffer = await fs.readFile(absolute)
         return new NextResponse(buffer, {
           headers: {
-            'Content-Type': mimeFromUrl(logoPath),
+            'Content-Type': mimeFromUrl(relative),
             'Cache-Control': 'no-cache, must-revalidate',
           },
         })

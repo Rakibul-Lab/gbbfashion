@@ -1,5 +1,6 @@
 /** Client-safe defaults (no Node fs imports) */
-export const DEFAULT_LOGO_URL = '/logo.svg'
+/** Prefer uploaded brand logo; `public/logo.svg` is the offline fallback (not Z Chat). */
+export const DEFAULT_LOGO_URL = '/uploads/logo.png'
 export const DEFAULT_LOGO_WIDTH = 36
 export const DEFAULT_LOGO_HEIGHT = 36
 export const MIN_LOGO_DIM = 16

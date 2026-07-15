@@ -33,8 +33,9 @@ const geistMono = Geist_Mono({
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings()
-  const iconUrl = settings.logoUrl || '/logo.svg'
+  const iconUrl = settings.logoUrl || '/uploads/logo.png'
   const iconType = mimeFromUrl(iconUrl)
+  const faviconHref = `/api/favicon?v=${encodeURIComponent(iconUrl)}`
 
   return {
     metadataBase: new URL(siteConfig.url),
@@ -50,9 +51,9 @@ export async function generateMetadata(): Promise<Metadata> {
     formatDetection: { email: false, address: false, telephone: false },
     alternates: { canonical: '/' },
     icons: {
-      icon: [{ url: '/api/favicon', type: iconType }],
-      shortcut: '/api/favicon',
-      apple: [{ url: '/api/favicon', type: iconType }],
+      icon: [{ url: faviconHref, type: iconType }],
+      shortcut: faviconHref,
+      apple: [{ url: faviconHref, type: iconType }],
     },
     robots: {
       index: true,

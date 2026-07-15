@@ -3043,7 +3043,7 @@ export function AdminDashboard() {
   // ─── Settings Page ─────────────────────────────────────────────────────────
 
   function SettingsPage() {
-    const [logoUrl, setLogoUrl] = useState('/logo.svg')
+    const [logoUrl, setLogoUrl] = useState('/uploads/logo.png')
     const [logoWidth, setLogoWidth] = useState(36)
     const [logoHeight, setLogoHeight] = useState(36)
     const [widthInput, setWidthInput] = useState('36')
