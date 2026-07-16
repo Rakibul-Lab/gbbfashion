@@ -39,6 +39,7 @@ import { normalizePrimeCollection } from '@/lib/prime-collection'
 interface Product {
   id: string
   name: string
+  slug?: string | null
   description: string
   price: number
   originalPrice?: number | null
@@ -617,7 +618,7 @@ export function ProductGrid() {
                       key={product.id}
                       product={product}
                       index={index}
-                      onOpen={() => goToProduct(product.id)}
+                      onOpen={() => goToProduct({ id: product.id, slug: product.slug })}
                     />
                   ))}
                 </div>

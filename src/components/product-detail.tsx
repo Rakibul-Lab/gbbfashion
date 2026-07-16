@@ -26,6 +26,7 @@ import { trackViewItem } from '@/lib/gtm'
 interface Product {
   id: string
   name: string
+  slug?: string | null
   description: string
   price: number
   originalPrice?: number | null
@@ -456,7 +457,7 @@ export function ProductDetail() {
                   <Card
                     key={p.id}
                     className="group overflow-hidden rounded-xl border-slate-200 p-0 gap-0 hover:shadow-lg transition-all duration-300 cursor-pointer h-full flex flex-col"
-                    onClick={() => goToProduct(p.id)}
+                    onClick={() => goToProduct({ id: p.id, slug: p.slug })}
                   >
                     <div className={`${productImageContainerClass} rounded-none`}>
                       <OptimizedImage

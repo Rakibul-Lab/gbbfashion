@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { resolveProductSlugInput } from '@/lib/product-slug-db'
 import { inStockFromQuantity, normalizeStock } from '@/lib/stock'
 
 const cacheHeaders = {
@@ -22,6 +23,8 @@ export async function GET(request: NextRequest) {
       where.OR = [
         { name: { equals: search } },
         { name: { contains: search } },
+        { slug: { equals: search } },
+        { slug: { contains: search } },
         { description: { contains: search } },
       ]
     }
@@ -46,9 +49,15 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const stock = normalizeStock(body.stock, 100)
+    const slug = await resolveProductSlugInput({
+      name: String(body.name || ''),
+      image: body.image,
+    })
+
     const product = await db.product.create({
       data: {
         name: body.name,
+        slug,
         description: body.description,
         price: body.price,
         originalPrice: body.originalPrice ?? null,

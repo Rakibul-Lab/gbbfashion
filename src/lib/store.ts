@@ -182,8 +182,9 @@ function pushViewUrl(
   mode: 'push' | 'replace'
 ) {
   // Let Next.js own shop/product deep links when already on those paths
-  if (state.view === 'shop' && typeof window !== 'undefined') {
-    if (window.location.pathname.startsWith('/collections')) return
+  if (typeof window !== 'undefined') {
+    if (state.view === 'shop' && window.location.pathname.startsWith('/collections')) return
+    if (state.view === 'product' && window.location.pathname.startsWith('/products/')) return
   }
   const path = buildViewPath(state.view, {
     productId: state.selectedProductId,

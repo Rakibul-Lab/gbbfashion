@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { findProductByParam, resolveProductSlugInput } from '@/lib/product-slug-db'
 import { inStockFromQuantity, normalizeStock } from '@/lib/stock'
 
 export async function GET(
@@ -8,7 +9,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const product = await db.product.findUnique({ where: { id } })
+    const product = await findProductByParam(id)
 
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -16,7 +17,8 @@ export async function GET(
 
     return NextResponse.json(product, {
       headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=900',
+        // Avoid stale product payloads (esp. new images) after admin create/update
+        'Cache-Control': 'no-store',
       },
     })
   } catch (error) {
@@ -31,13 +33,24 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
+    const existing = await findProductByParam(id)
+    if (!existing) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+
     const body = await request.json()
     const stock = normalizeStock(body.stock, 0)
+    const slug = await resolveProductSlugInput({
+      name: String(body.name ?? existing.name),
+      image: body.image ?? existing.image,
+      excludeId: existing.id,
+    })
 
     const product = await db.product.update({
-      where: { id },
+      where: { id: existing.id },
       data: {
         name: body.name,
+        slug,
         description: body.description,
         price: body.price,
         originalPrice: body.originalPrice ?? null,
@@ -74,12 +87,12 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const existing = await db.product.findUnique({ where: { id } })
+    const existing = await findProductByParam(id)
     if (!existing) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    await db.product.delete({ where: { id } })
+    await db.product.delete({ where: { id: existing.id } })
     return NextResponse.json({ message: 'Product deleted' })
   } catch (error) {
     console.error('Product DELETE error:', error)

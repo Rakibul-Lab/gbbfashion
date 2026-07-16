@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, Fragment, type ChangeEvent } from 'react'
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react'
 import { useStore } from '@/lib/store'
 import { productThumbClass } from '@/lib/product-image'
 import {
@@ -79,6 +79,7 @@ import {
   FileText,
   FolderTree,
   LayoutGrid,
+  Images,
   Sparkles,
   Star,
   UserCircle,
@@ -90,6 +91,8 @@ import {
   Construction,
 } from 'lucide-react'
 import { OrderInvoiceDialog, type InvoiceOrder } from '@/components/order-invoice'
+import { MediaLibraryModal, type MediaItem } from '@/components/media-library-modal'
+import { MediaPickerButton } from '@/components/media-picker-button'
 import { AdminCategoriesPage } from '@/components/admin-categories-page'
 import { AdminContentPage } from '@/components/admin-content-page'
 import { AdminUsersPage } from '@/components/admin-users-page'
@@ -337,9 +340,8 @@ export function AdminDashboard() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [productForm, setProductForm] = useState(emptyProduct)
   const [savingProduct, setSavingProduct] = useState(false)
-  const [uploadingPrimary, setUploadingPrimary] = useState(false)
-  const [uploadingSecondary, setUploadingSecondary] = useState(false)
-  const [uploadingVariantIndex, setUploadingVariantIndex] = useState<number | null>(null)
+  /** WordPress-style media picker target */
+  const [mediaPicker, setMediaPicker] = useState<null | 'primary' | number>(null)
   const [colorVariants, setColorVariants] = useState<ProductColorVariant[]>([])
   const [productSearch, setProductSearch] = useState('')
   const [productPage, setProductPage] = useState(1)
@@ -350,10 +352,6 @@ export function AdminDashboard() {
   const [reelForm, setReelForm] = useState(emptyReel)
   const [reelColorVariants, setReelColorVariants] = useState<ReelColorVariant[]>([])
   const [savingReel, setSavingReel] = useState(false)
-  const [uploadingReelVideo, setUploadingReelVideo] = useState(false)
-  const [uploadingReelThumb, setUploadingReelThumb] = useState(false)
-  const [uploadingReelPoster, setUploadingReelPoster] = useState(false)
-  const [uploadingReelColorIndex, setUploadingReelColorIndex] = useState<number | null>(null)
   const [reelSearch, setReelSearch] = useState('')
   const [reelStatusFilter, setReelStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [reelPage, setReelPage] = useState(1)
@@ -506,67 +504,18 @@ export function AdminDashboard() {
     setColorVariants([])
   }
 
-  const uploadProductImage = async (file: File, kind: 'primary' | 'gallery') => {
-    const formData = new FormData()
-    formData.append('image', file)
-    formData.append('kind', kind)
-    const res = await fetch('/api/products/upload', {
-      method: 'POST',
-      body: formData,
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Upload failed')
-    return data.url as string
-  }
-
-  const handlePrimaryImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    setUploadingPrimary(true)
-    try {
-      const url = await uploadProductImage(file, 'primary')
+  const handleMediaLibrarySelect = (url: string) => {
+    if (mediaPicker === 'primary') {
       setProductForm((p) => ({ ...p, image: url }))
-      toast.success('Product image uploaded')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed')
-    } finally {
-      setUploadingPrimary(false)
-    }
-  }
-
-  const handleSecondaryImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    setUploadingSecondary(true)
-    try {
-      const url = await uploadProductImage(file, 'gallery')
-      setProductForm((p) => ({ ...p, secondaryImage: url }))
-      toast.success('Gallery image uploaded')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed')
-    } finally {
-      setUploadingSecondary(false)
-    }
-  }
-
-  const handleVariantImageChange = async (index: number, e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    setUploadingVariantIndex(index)
-    try {
-      const url = await uploadProductImage(file, 'gallery')
+      toast.success('Featured image selected')
+    } else if (typeof mediaPicker === 'number') {
+      const index = mediaPicker
       setColorVariants((prev) =>
         prev.map((v, i) => (i === index ? { ...v, image: url } : v))
       )
-      toast.success('Color image uploaded')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed')
-    } finally {
-      setUploadingVariantIndex(null)
+      toast.success('Color image selected')
     }
+    setMediaPicker(null)
   }
 
   const addColorVariant = () => {
@@ -652,89 +601,6 @@ export function AdminDashboard() {
   }
 
   // ─── Reel handlers ────────────────────────────────────────────────────────
-
-  const uploadReelMedia = async (file: File, kind: string) => {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('kind', kind)
-    const res = await fetch('/api/reels/upload', {
-      method: 'POST',
-      body: formData,
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Upload failed')
-    return data.url as string
-  }
-
-  const handleReelVideoChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    setUploadingReelVideo(true)
-    try {
-      const url = await uploadReelMedia(file, 'video')
-      setReelForm((p) => ({ ...p, videoSrc: url }))
-      toast.success('Reel video uploaded')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Video upload failed')
-    } finally {
-      setUploadingReelVideo(false)
-    }
-  }
-
-  const handleReelProductImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    setUploadingReelThumb(true)
-    try {
-      const url = await uploadReelMedia(file, 'product')
-      setReelForm((p) => ({
-        ...p,
-        thumbnail: url,
-        videoThumbnail: p.videoThumbnail || url,
-      }))
-      toast.success('Product image uploaded')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Image upload failed')
-    } finally {
-      setUploadingReelThumb(false)
-    }
-  }
-
-  const handleReelPosterChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    setUploadingReelPoster(true)
-    try {
-      const url = await uploadReelMedia(file, 'poster')
-      setReelForm((p) => ({ ...p, videoThumbnail: url }))
-      toast.success('Video poster uploaded')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Poster upload failed')
-    } finally {
-      setUploadingReelPoster(false)
-    }
-  }
-
-  const handleReelColorImageChange = async (index: number, e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    setUploadingReelColorIndex(index)
-    try {
-      const url = await uploadReelMedia(file, 'color')
-      setReelColorVariants((prev) =>
-        prev.map((v, i) => (i === index ? { ...v, image: url } : v))
-      )
-      toast.success('Color image uploaded')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Image upload failed')
-    } finally {
-      setUploadingReelColorIndex(null)
-    }
-  }
 
   const addReelColorVariant = () => {
     setReelColorVariants((prev) => [
@@ -1218,6 +1084,30 @@ export function AdminDashboard() {
         currencySymbol={currencySymbol}
       />
 
+      <MediaLibraryModal
+        open={mediaPicker !== null}
+        onOpenChange={(open) => {
+          if (!open) setMediaPicker(null)
+        }}
+        currentUrl={
+          mediaPicker === 'primary'
+            ? productForm.image
+            : typeof mediaPicker === 'number'
+              ? colorVariants[mediaPicker]?.image || ''
+              : ''
+        }
+        title={
+          mediaPicker === 'primary'
+            ? 'Select featured image'
+            : typeof mediaPicker === 'number'
+              ? `Select image — ${colorVariants[mediaPicker]?.name || 'color'}`
+              : 'Media library'
+        }
+        folder="products"
+        accept="image"
+        onSelect={handleMediaLibrarySelect}
+      />
+
       {/* Product Dialog removed — inline editor on Products page */}
 
       {/* Reel Dialog */}
@@ -1290,28 +1180,20 @@ export function AdminDashboard() {
                       <p className="text-xs">No video yet</p>
                     </div>
                   )}
-                  {uploadingReelVideo && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <Loader2 className="h-7 w-7 animate-spin text-white" />
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-2 justify-center">
-                  <Label
-                    htmlFor="reel-video-upload"
-                    className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-slate-900 text-white text-sm font-medium cursor-pointer hover:bg-slate-800"
-                  >
-                    <Upload className="h-3.5 w-3.5" />
-                    Upload video
-                  </Label>
-                  <Input
-                    id="reel-video-upload"
-                    type="file"
-                    accept="video/mp4,video/webm,video/quicktime"
-                    className="hidden"
-                    onChange={handleReelVideoChange}
-                    disabled={uploadingReelVideo}
+                  <MediaPickerButton
+                    label="Select / Upload video"
+                    title="Reel video — media library"
+                    folder="reels"
+                    accept="video"
+                    currentUrl={reelForm.videoSrc}
+                    className="h-9 bg-slate-900 hover:bg-slate-800 text-white"
+                    onSelect={(url) => {
+                      setReelForm((p) => ({ ...p, videoSrc: url }))
+                      toast.success('Reel video selected')
+                    }}
                   />
                   {reelForm.videoSrc ? (
                     <Button
@@ -1340,26 +1222,19 @@ export function AdminDashboard() {
                           <ImageIcon className="h-4 w-4" />
                         </div>
                       )}
-                      {uploadingReelPoster && (
-                        <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        </div>
-                      )}
                     </div>
-                    <Label
-                      htmlFor="reel-poster-upload"
-                      className="inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-slate-200 bg-white text-xs font-medium cursor-pointer hover:bg-slate-50"
-                    >
-                      <Upload className="h-3 w-3" />
-                      Choose poster
-                    </Label>
-                    <Input
-                      id="reel-poster-upload"
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      className="hidden"
-                      onChange={handleReelPosterChange}
-                      disabled={uploadingReelPoster}
+                    <MediaPickerButton
+                      label="Select / Upload poster"
+                      title="Reel video poster"
+                      folder="reels"
+                      accept="image"
+                      currentUrl={reelForm.videoThumbnail || ''}
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onSelect={(url) => {
+                        setReelForm((p) => ({ ...p, videoThumbnail: url }))
+                        toast.success('Poster selected')
+                      }}
                     />
                   </div>
                 </div>
@@ -1467,27 +1342,19 @@ export function AdminDashboard() {
                           <span className="text-[10px]">Required</span>
                         </div>
                       )}
-                      {uploadingReelThumb && (
-                        <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                          <Loader2 className="h-5 w-5 animate-spin text-slate-700" />
-                        </div>
-                      )}
                     </div>
                     <div className="space-y-2">
-                      <Label
-                        htmlFor="reel-product-image"
-                        className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-slate-900 text-white text-sm font-medium cursor-pointer hover:bg-slate-800"
-                      >
-                        <Upload className="h-3.5 w-3.5" />
-                        Upload image
-                      </Label>
-                      <Input
-                        id="reel-product-image"
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="hidden"
-                        onChange={handleReelProductImageChange}
-                        disabled={uploadingReelThumb}
+                      <MediaPickerButton
+                        label="Select / Upload image"
+                        title="Reel product image"
+                        folder="reels"
+                        accept="image"
+                        currentUrl={reelForm.thumbnail}
+                        className="h-9 bg-slate-900 hover:bg-slate-800 text-white"
+                        onSelect={(url) => {
+                          setReelForm((p) => ({ ...p, thumbnail: url }))
+                          toast.success('Product image selected')
+                        }}
                       />
                       {reelForm.thumbnail ? (
                         <Button
@@ -1501,7 +1368,7 @@ export function AdminDashboard() {
                         </Button>
                       ) : null}
                       <p className="text-[11px] text-slate-400 max-w-[180px]">
-                        Square product photo shown with the reel · JPG/PNG/WEBP · max 5MB
+                        Square product photo shown with the reel
                       </p>
                     </div>
                   </div>
@@ -1544,11 +1411,6 @@ export function AdminDashboard() {
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-slate-300">
                             <ImageIcon className="h-5 w-5" />
-                          </div>
-                        )}
-                        {uploadingReelColorIndex === index && (
-                          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                            <Loader2 className="h-4 w-4 animate-spin" />
                           </div>
                         )}
                       </div>
@@ -1596,20 +1458,20 @@ export function AdminDashboard() {
                             />
                           </div>
                         </div>
-                        <Label
-                          htmlFor={`reel-color-image-${index}`}
-                          className="inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-slate-200 bg-white text-xs font-medium cursor-pointer hover:bg-slate-50 w-fit"
-                        >
-                          <Upload className="h-3 w-3" />
-                          Upload color image
-                        </Label>
-                        <Input
-                          id={`reel-color-image-${index}`}
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          className="hidden"
-                          onChange={(e) => handleReelColorImageChange(index, e)}
-                          disabled={uploadingReelColorIndex === index}
+                        <MediaPickerButton
+                          label="Select / Upload color image"
+                          title={`Reel color — ${variant.name || 'image'}`}
+                          folder="reels"
+                          accept="image"
+                          currentUrl={variant.image}
+                          variant="outline"
+                          className="h-8 text-xs w-fit"
+                          onSelect={(url) => {
+                            setReelColorVariants((prev) =>
+                              prev.map((v, i) => (i === index ? { ...v, image: url } : v))
+                            )
+                            toast.success('Color image selected')
+                          }}
                         />
                       </div>
                       <Button
@@ -1638,13 +1500,7 @@ export function AdminDashboard() {
             </Button>
             <Button
               onClick={() => void handleSaveReel()}
-              disabled={
-                savingReel ||
-                uploadingReelVideo ||
-                uploadingReelThumb ||
-                uploadingReelPoster ||
-                uploadingReelColorIndex !== null
-              }
+              disabled={savingReel}
               className="bg-slate-900 hover:bg-slate-800 text-white min-w-[120px]"
             >
               {savingReel ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -1870,7 +1726,7 @@ export function AdminDashboard() {
             </Button>
             <Button
               onClick={handleSaveProduct}
-              disabled={savingProduct || uploadingPrimary || uploadingSecondary}
+              disabled={savingProduct}
               className="bg-[#7F54B3] hover:bg-[#6d47a0] text-white shadow-sm"
             >
               {savingProduct ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
@@ -1987,28 +1843,16 @@ export function AdminDashboard() {
                         <p className="text-xs">No image</p>
                       </div>
                     )}
-                    {uploadingPrimary && (
-                      <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                        <Loader2 className="h-7 w-7 animate-spin text-[#7F54B3]" />
-                      </div>
-                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label
-                      htmlFor="primary-image-upload"
-                      className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-slate-900 text-white text-sm font-medium cursor-pointer hover:bg-slate-800"
+                    <Button
+                      type="button"
+                      className="h-9 bg-slate-900 hover:bg-slate-800 text-white"
+                      onClick={() => setMediaPicker('primary')}
                     >
-                      <Upload className="h-3.5 w-3.5" />
-                      Choose file
-                    </Label>
-                    <Input
-                      id="primary-image-upload"
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      className="hidden"
-                      onChange={handlePrimaryImageChange}
-                      disabled={uploadingPrimary}
-                    />
+                      <Images className="h-3.5 w-3.5 mr-1.5" />
+                      Select / Upload image
+                    </Button>
                     {productForm.image ? (
                       <Button
                         type="button"
@@ -2020,7 +1864,8 @@ export function AdminDashboard() {
                       </Button>
                     ) : null}
                     <p className="text-[11px] text-slate-400 max-w-xs">
-                      This is the default image shown before a color is selected.
+                      Open the media library to pick an existing image or upload a new one
+                      (WordPress-style).
                     </p>
                   </div>
                 </div>
@@ -2072,11 +1917,6 @@ export function AdminDashboard() {
                               <ImageIcon className="h-6 w-6" />
                             </div>
                           )}
-                          {uploadingVariantIndex === index && (
-                            <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                              <Loader2 className="h-5 w-5 animate-spin text-[#7F54B3]" />
-                            </div>
-                          )}
                         </div>
 
                         <div className="space-y-2 min-w-0">
@@ -2121,21 +1961,16 @@ export function AdminDashboard() {
                             </div>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <Label
-                              htmlFor={`variant-image-${index}`}
-                              className="inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-slate-200 bg-white text-xs font-medium cursor-pointer hover:bg-slate-50"
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => setMediaPicker(index)}
                             >
-                              <Upload className="h-3 w-3" />
-                              Choose file
-                            </Label>
-                            <Input
-                              id={`variant-image-${index}`}
-                              type="file"
-                              accept="image/png,image/jpeg,image/webp"
-                              className="hidden"
-                              onChange={(e) => handleVariantImageChange(index, e)}
-                              disabled={uploadingVariantIndex === index}
-                            />
+                              <Images className="h-3 w-3 mr-1" />
+                              Select / Upload
+                            </Button>
                             {variant.image ? (
                               <Button
                                 type="button"
@@ -2270,7 +2105,7 @@ export function AdminDashboard() {
                 <Separator />
                 <Button
                   onClick={handleSaveProduct}
-                  disabled={savingProduct || uploadingPrimary || uploadingSecondary}
+                  disabled={savingProduct}
                   className="w-full bg-[#7F54B3] hover:bg-[#6d47a0] text-white"
                 >
                   {savingProduct ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
@@ -3102,17 +2937,12 @@ export function AdminDashboard() {
     const [logoHeight, setLogoHeight] = useState(36)
     const [widthInput, setWidthInput] = useState('36')
     const [heightInput, setHeightInput] = useState('36')
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-    const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [uploading, setUploading] = useState(false)
     const [savingSize, setSavingSize] = useState(false)
     const [loadingLogo, setLoadingLogo] = useState(true)
 
     const [heroMediaType, setHeroMediaType] = useState<'image' | 'video'>('image')
     const [heroMediaUrl, setHeroMediaUrl] = useState('')
-    const [heroUploadType, setHeroUploadType] = useState<'image' | 'video'>('image')
-    const [heroFile, setHeroFile] = useState<File | null>(null)
-    const [heroPreview, setHeroPreview] = useState<string | null>(null)
     const [uploadingHero, setUploadingHero] = useState(false)
     const [selectedCurrency, setSelectedCurrency] = useState(currencyCode || DEFAULT_CURRENCY_CODE)
     const [savingCurrency, setSavingCurrency] = useState(false)
@@ -3175,7 +3005,6 @@ export function AdminDashboard() {
           syncDims(w, h)
           if (data?.heroMediaType === 'video' || data?.heroMediaType === 'image') {
             setHeroMediaType(data.heroMediaType)
-            setHeroUploadType(data.heroMediaType)
           }
           if (typeof data?.heroMediaUrl === 'string') setHeroMediaUrl(data.heroMediaUrl)
           if (typeof data?.currencyCode === 'string' && data.currencyCode) {
@@ -3415,34 +3244,33 @@ export function AdminDashboard() {
       }
     }
 
-    const handleWhatsappIconUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      e.target.value = ''
-      if (!file) return
+    const handleWhatsappIconSelect = async (url: string) => {
       setUploadingWhatsappIcon(true)
       try {
-        const formData = new FormData()
-        formData.append('icon', file)
-        const res = await fetch('/api/settings/whatsapp-icon', {
-          method: 'POST',
-          body: formData,
+        const res = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            whatsappIconId: 'custom',
+            whatsappIconUrl: url,
+          }),
         })
         const data = await res.json()
         if (!res.ok) {
-          toast.error(data.error || 'Could not upload icon')
+          toast.error(data.error || 'Could not save icon')
           return
         }
         const nextId = (data.whatsappIconId || 'custom') as WhatsAppIconId
-        const nextUrl = data.whatsappIconUrl || ''
+        const nextUrl = data.whatsappIconUrl || url
         setWhatsappIconId(nextId)
         setWhatsappIconUrl(nextUrl)
         broadcastStoreSettings({
           whatsappIconId: nextId,
           whatsappIconUrl: nextUrl,
         })
-        toast.success('Custom WhatsApp icon uploaded')
+        toast.success('Custom WhatsApp icon saved')
       } catch {
-        toast.error('Could not upload icon')
+        toast.error('Could not save icon')
       } finally {
         setUploadingWhatsappIcon(false)
       }
@@ -3471,46 +3299,31 @@ export function AdminDashboard() {
       }
     }
 
-    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      if (!file) return
-      setSelectedFile(file)
-      setPreviewUrl(URL.createObjectURL(file))
-    }
-
-    const handleUpload = async () => {
-      if (!selectedFile) {
-        toast.error('Choose a logo file first')
-        return
-      }
-
+    const handleLogoSelect = async (url: string) => {
       setUploading(true)
       try {
-        const formData = new FormData()
-        formData.append('logo', selectedFile)
-        const res = await fetch('/api/settings/logo', {
-          method: 'POST',
-          body: formData,
+        const res = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ logoUrl: url }),
         })
         const data = await res.json()
         if (!res.ok) {
-          toast.error(data.error || 'Upload failed')
+          toast.error(data.error || 'Could not save logo')
           return
         }
-        setLogoUrl(data.logoUrl)
+        setLogoUrl(data.logoUrl || url)
         if (typeof data.logoWidth === 'number' && typeof data.logoHeight === 'number') {
           syncDims(data.logoWidth, data.logoHeight)
         }
-        setSelectedFile(null)
-        setPreviewUrl(null)
         broadcastBranding({
-          logoUrl: data.logoUrl,
+          logoUrl: data.logoUrl || url,
           logoWidth: data.logoWidth ?? logoWidth,
           logoHeight: data.logoHeight ?? logoHeight,
         })
         toast.success('Logo updated — browser tab icon refreshed')
       } catch {
-        toast.error('Upload failed')
+        toast.error('Could not save logo')
       } finally {
         setUploading(false)
       }
@@ -3529,8 +3342,6 @@ export function AdminDashboard() {
         if (typeof data.logoWidth === 'number' && typeof data.logoHeight === 'number') {
           syncDims(data.logoWidth, data.logoHeight)
         }
-        setSelectedFile(null)
-        setPreviewUrl(null)
         broadcastBranding({
           logoUrl: data.logoUrl,
           logoWidth: data.logoWidth ?? logoWidth,
@@ -3590,47 +3401,37 @@ export function AdminDashboard() {
       }
     }
 
-    const handleHeroFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      if (!file) return
-      setHeroFile(file)
-      if (heroPreview) URL.revokeObjectURL(heroPreview)
-      setHeroPreview(URL.createObjectURL(file))
-      if (file.type.startsWith('video/')) setHeroUploadType('video')
-      else setHeroUploadType('image')
-    }
-
-    const handleHeroUpload = async () => {
-      if (!heroFile) {
-        toast.error('Choose a hero image or video first')
-        return
-      }
+    const handleHeroSelect = async (url: string, item?: MediaItem) => {
+      const nextType = item?.kind === 'video' ? 'video' : 'image'
       setUploadingHero(true)
       try {
-        const formData = new FormData()
-        formData.append('hero', heroFile)
-        formData.append('type', heroUploadType)
-        const res = await fetch('/api/settings/hero', {
-          method: 'POST',
-          body: formData,
+        const res = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            heroMediaUrl: url,
+            heroMediaType: nextType,
+          }),
         })
         const data = await res.json()
         if (!res.ok) {
-          toast.error(data.error || 'Hero upload failed')
+          toast.error(data.error || 'Could not save hero media')
           return
         }
-        setHeroMediaType(data.heroMediaType)
-        setHeroMediaUrl(data.heroMediaUrl)
-        setHeroFile(null)
-        if (heroPreview) URL.revokeObjectURL(heroPreview)
-        setHeroPreview(null)
+        const type =
+          data.heroMediaType === 'video' || data.heroMediaType === 'image'
+            ? data.heroMediaType
+            : nextType
+        const mediaUrl = typeof data.heroMediaUrl === 'string' ? data.heroMediaUrl : url
+        setHeroMediaType(type)
+        setHeroMediaUrl(mediaUrl)
         broadcastBranding({
-          heroMediaType: data.heroMediaType,
-          heroMediaUrl: data.heroMediaUrl,
+          heroMediaType: type,
+          heroMediaUrl: mediaUrl,
         })
-        toast.success(`Hero ${data.heroMediaType} uploaded`)
+        toast.success(`Hero ${type} saved`)
       } catch {
-        toast.error('Hero upload failed')
+        toast.error('Could not save hero media')
       } finally {
         setUploadingHero(false)
       }
@@ -3647,10 +3448,6 @@ export function AdminDashboard() {
         }
         setHeroMediaType(data.heroMediaType)
         setHeroMediaUrl(data.heroMediaUrl)
-        setHeroUploadType('image')
-        setHeroFile(null)
-        if (heroPreview) URL.revokeObjectURL(heroPreview)
-        setHeroPreview(null)
         broadcastBranding({
           heroMediaType: data.heroMediaType,
           heroMediaUrl: data.heroMediaUrl,
@@ -3663,8 +3460,8 @@ export function AdminDashboard() {
       }
     }
 
-    const displayLogo = previewUrl || logoUrl
-    const displayHero = heroPreview || heroMediaUrl
+    const displayLogo = logoUrl
+    const displayHero = heroMediaUrl
 
     return (
       <div className="space-y-6 max-w-3xl">
@@ -4011,7 +3808,7 @@ export function AdminDashboard() {
             <div className="space-y-3">
               <Label>Chat button icon</Label>
               <p className="text-xs text-slate-500">
-                Pick a style, or upload your own image (PNG/JPG/WEBP/SVG · max 2MB · square recommended).
+                Pick a style, or choose an image from the media library (PNG/JPG/WEBP/SVG · square recommended).
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                 {WHATSAPP_ICON_PRESETS.map((preset) => {
@@ -4056,24 +3853,15 @@ export function AdminDashboard() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <Label
-                  htmlFor="whatsapp-icon-upload"
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  {uploadingWhatsappIcon ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4" />
-                  )}
-                  Upload icon
-                </Label>
-                <Input
-                  id="whatsapp-icon-upload"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                  className="hidden"
-                  onChange={handleWhatsappIconUpload}
-                  disabled={uploadingWhatsappIcon}
+                <MediaPickerButton
+                  label="Select / Upload icon"
+                  title="WhatsApp chat icon"
+                  folder="branding"
+                  accept="image"
+                  currentUrl={whatsappIconId === 'custom' ? whatsappIconUrl : ''}
+                  loading={uploadingWhatsappIcon}
+                  variant="outline"
+                  onSelect={(url) => void handleWhatsappIconSelect(url)}
                 />
                 {whatsappIconUrl ? (
                   <Button
@@ -4240,29 +4028,23 @@ export function AdminDashboard() {
 
               <div className="flex-1 space-y-4 w-full">
                 <div className="space-y-2">
-                  <Label htmlFor="logo-upload">Upload logo</Label>
-                  <Input
-                    id="logo-upload"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                    onChange={handleFileChange}
-                    className="cursor-pointer"
-                  />
+                  <Label>Logo</Label>
+                  <p className="text-xs text-slate-500">
+                    Pick from the media library or upload a new image (PNG/JPG/WEBP/SVG).
+                  </p>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={handleUpload}
-                    disabled={!selectedFile || uploading}
+                  <MediaPickerButton
+                    label="Select / Upload logo"
+                    title="Site logo"
+                    folder="branding"
+                    accept="image"
+                    currentUrl={logoUrl}
+                    loading={uploading}
                     className="bg-slate-900 hover:bg-slate-800 text-white"
-                  >
-                    {uploading ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Upload className="h-4 w-4 mr-2" />
-                    )}
-                    Upload Logo
-                  </Button>
+                    onSelect={(url) => void handleLogoSelect(url)}
+                  />
                   <Button
                     variant="outline"
                     onClick={handleReset}
@@ -4355,26 +4137,9 @@ export function AdminDashboard() {
               <p>Hero area is wide and tall — landscape media looks best.</p>
             </div>
 
-            <div className="space-y-2">
-              <Label>Media type to upload</Label>
-              <Select
-                value={heroUploadType}
-                onValueChange={(v) => setHeroUploadType(v === 'video' ? 'video' : 'image')}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="image">Image</SelectItem>
-                  <SelectItem value="video">Video</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="relative w-full aspect-video overflow-hidden rounded-xl border border-slate-200 bg-slate-900">
               {displayHero ? (
-                ((heroPreview && heroFile?.type.startsWith('video/')) ||
-                (!heroPreview && heroMediaType === 'video')) ? (
+                heroMediaType === 'video' ? (
                   <video
                     key={displayHero}
                     src={displayHero}
@@ -4403,36 +4168,17 @@ export function AdminDashboard() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="hero-upload">
-                Upload hero {heroUploadType === 'video' ? 'video' : 'image'}
-              </Label>
-              <Input
-                id="hero-upload"
-                type="file"
-                accept={
-                  heroUploadType === 'video'
-                    ? 'video/mp4,video/webm'
-                    : 'image/png,image/jpeg,image/webp'
-                }
-                onChange={handleHeroFileChange}
-                className="cursor-pointer"
-              />
-            </div>
-
             <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={handleHeroUpload}
-                disabled={!heroFile || uploadingHero}
+              <MediaPickerButton
+                label="Select / Upload hero"
+                title="Homepage hero (image or video)"
+                folder="branding"
+                accept="media"
+                currentUrl={heroMediaUrl}
+                loading={uploadingHero}
                 className="bg-slate-900 hover:bg-slate-800 text-white"
-              >
-                {uploadingHero ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Upload className="h-4 w-4 mr-2" />
-                )}
-                Upload Hero {heroUploadType === 'video' ? 'Video' : 'Image'}
-              </Button>
+                onSelect={(url, item) => void handleHeroSelect(url, item)}
+              />
               <Button
                 variant="outline"
                 onClick={handleHeroReset}

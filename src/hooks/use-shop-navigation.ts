@@ -6,11 +6,14 @@ import { toast } from 'sonner'
 import { useStore } from '@/lib/store'
 import { resolveShopMode } from '@/lib/categories'
 import { buildShopPath } from '@/lib/shop-navigation'
+import { productUrlPath } from '@/lib/product-slug'
 import type { ShopMode } from '@/lib/categories'
 
 function looksLikeDbId(id: string) {
   return /^c[a-z0-9]{20,}$/i.test(id)
 }
+
+type ProductLink = { id: string; slug?: string | null }
 
 export function useShopNavigation() {
   const router = useRouter()
@@ -39,21 +42,36 @@ export function useShopNavigation() {
   }, [router])
 
   const goToProduct = useCallback(
-    (productId: string) => {
+    (product: ProductLink | string) => {
+      const link =
+        typeof product === 'string' ? { id: product, slug: null } : product
       const { selectProduct, setView } = useStore.getState()
-      selectProduct(productId)
+      selectProduct(link.id)
       setView('product', { syncUrl: false })
-      router.push(`/products/${productId}`)
+      router.push(productUrlPath(link))
     },
     [router]
   )
 
-  /** Open product detail by DB id, or resolve homepage/featured items by name */
+  /** Open product detail by DB id / slug, or resolve homepage items by name */
   const openProduct = useCallback(
-    async (opts: { id?: string; name: string }) => {
+    async (opts: { id?: string; slug?: string | null; name: string }) => {
       if (opts.id && looksLikeDbId(opts.id)) {
-        goToProduct(opts.id)
+        goToProduct({ id: opts.id, slug: opts.slug })
         return
+      }
+
+      if (opts.slug) {
+        try {
+          const res = await fetch(`/api/products/${encodeURIComponent(opts.slug)}`)
+          const data = await res.json()
+          if (res.ok && data?.id) {
+            goToProduct({ id: data.id, slug: data.slug || opts.slug })
+            return
+          }
+        } catch {
+          // fall through to name search
+        }
       }
 
       try {
@@ -68,7 +86,7 @@ export function useShopNavigation() {
           (p: { name: string }) => p.name.toLowerCase() === opts.name.toLowerCase()
         )
         const match = exact || data[0]
-        goToProduct(match.id)
+        goToProduct({ id: match.id, slug: match.slug })
       } catch {
         toast.error('Could not open product')
       }

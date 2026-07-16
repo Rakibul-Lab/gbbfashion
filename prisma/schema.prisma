@@ -67,6 +67,8 @@ model SubCategory {
 model Product {
   id             String      @id @default(cuid())
   name           String
+  /** Public URL segment — usually from featured image filename */
+  slug           String?     @unique
   description    String      @db.Text
   price          Float
   originalPrice  Float?

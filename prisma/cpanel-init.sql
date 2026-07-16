@@ -62,6 +62,7 @@ CREATE TABLE `SubCategory` (
 CREATE TABLE `Product` (
     `id` VARCHAR(191) NOT NULL,
     `name` VARCHAR(191) NOT NULL,
+    `slug` VARCHAR(191) NULL,
     `description` TEXT NOT NULL,
     `price` DOUBLE NOT NULL,
     `originalPrice` DOUBLE NULL,
@@ -85,6 +86,7 @@ CREATE TABLE `Product` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
+    UNIQUE INDEX `Product_slug_key`(`slug`),
     INDEX `Product_category_idx`(`category`),
     INDEX `Product_isNewArrival_idx`(`isNewArrival`),
     INDEX `Product_isPrimeDrop_idx`(`isPrimeDrop`),

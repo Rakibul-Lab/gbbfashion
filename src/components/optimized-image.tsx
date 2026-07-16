@@ -1,7 +1,8 @@
 'use client'
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { cn } from '@/lib/utils'
 
 interface OptimizedImageProps {
   src?: string | null
@@ -19,6 +20,13 @@ interface OptimizedImageProps {
   fit?: 'cover' | 'fill' | 'contain'
 }
 
+/** Local uploads must bypass Next image optimizer on cPanel/standalone —
+ * newly written files often 404 through /_next/image until the app restarts. */
+function isLocalUpload(src: string) {
+  const clean = src.split('?')[0]
+  return clean.startsWith('/uploads/')
+}
+
 export function OptimizedImage({
   src,
   alt,
@@ -31,20 +39,71 @@ export function OptimizedImage({
   fit = 'fill',
 }: OptimizedImageProps) {
   const [failed, setFailed] = useState(false)
-  const objectFit = fit
+
+  useEffect(() => {
+    setFailed(false)
+  }, [src])
 
   const fitClass =
-    objectFit === 'contain'
+    fit === 'contain'
       ? 'object-contain'
-      : objectFit === 'cover'
+      : fit === 'cover'
         ? 'object-cover'
         : 'object-fill'
 
   if (!src || failed) {
     return (
       <div
-        className={`bg-gradient-to-br from-slate-100 to-slate-200 ${fill ? 'absolute inset-0 h-full w-full' : ''} ${className ?? ''}`}
+        className={cn(
+          'bg-gradient-to-br from-slate-100 to-slate-200',
+          fill && 'absolute inset-0 h-full w-full',
+          className
+        )}
         aria-hidden={!alt}
+      />
+    )
+  }
+
+  // Admin / user uploads: native <img> — immediate after upload, no optimizer lag
+  if (isLocalUpload(src)) {
+    if (fill) {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={src}
+          src={src}
+          alt={alt}
+          loading={priority ? 'eager' : 'lazy'}
+          decoding="async"
+          className={cn(
+            'absolute inset-0 !h-full !w-full object-center',
+            fitClass,
+            className
+          )}
+          style={{ objectFit: fit, objectPosition: 'center' }}
+          onError={() => setFailed(true)}
+        />
+      )
+    }
+
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        key={src}
+        src={src}
+        alt={alt}
+        width={width ?? 400}
+        height={height ?? 400}
+        loading={priority ? 'eager' : 'lazy'}
+        decoding="async"
+        className={cn(fitClass, className)}
+        style={{
+          objectFit: fit,
+          objectPosition: 'center',
+          width: '100%',
+          height: '100%',
+        }}
+        onError={() => setFailed(true)}
       />
     )
   }
@@ -52,13 +111,18 @@ export function OptimizedImage({
   if (fill) {
     return (
       <Image
+        key={src}
         src={src}
         alt={alt}
         fill
         sizes={sizes}
         priority={priority}
-        className={`absolute inset-0 !h-full !w-full ${fitClass} object-center ${className ?? ''}`}
-        style={{ objectFit, objectPosition: 'center' }}
+        className={cn(
+          'absolute inset-0 !h-full !w-full object-center',
+          fitClass,
+          className
+        )}
+        style={{ objectFit: fit, objectPosition: 'center' }}
         onError={() => setFailed(true)}
       />
     )
@@ -66,14 +130,20 @@ export function OptimizedImage({
 
   return (
     <Image
+      key={src}
       src={src}
       alt={alt}
       width={width ?? 400}
       height={height ?? 400}
       sizes={sizes}
       priority={priority}
-      className={`${fitClass} ${className ?? ''}`}
-      style={{ objectFit, objectPosition: 'center', width: '100%', height: '100%' }}
+      className={cn(fitClass, className)}
+      style={{
+        objectFit: fit,
+        objectPosition: 'center',
+        width: '100%',
+        height: '100%',
+      }}
       onError={() => setFailed(true)}
     />
   )

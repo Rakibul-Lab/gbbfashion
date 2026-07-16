@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, Megaphone, LayoutGrid, Images, Upload, Trash2 } from 'lucide-react'
+import { Loader2, Save, Megaphone, LayoutGrid, Images, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { AdminSectionMediaManager } from '@/components/admin-section-media'
+import { MediaPickerButton } from '@/components/media-picker-button'
 import { broadcastSectionMedia } from '@/hooks/use-section-media'
 import {
   DEFAULT_ANNOUNCEMENTS,
@@ -107,47 +108,42 @@ export function AdminContentPage() {
     }
   }
 
-  const uploadPromoMedia = async (index: number, file: File, type: 'image' | 'video') => {
+  const assignPromoMedia = async (
+    index: number,
+    url: string,
+    type: 'image' | 'video'
+  ) => {
     const slotKey = index === 0 ? 'promo_prime' : 'promo_second'
     setUploadingPromoIndex(index)
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('slot', slotKey)
-      formData.append('type', type)
-      const res = await fetch('/api/settings/section-media', {
-        method: 'POST',
-        body: formData,
+      const nextSection = mergeSectionMedia({
+        ...sectionMedia,
+        [slotKey]: { type, url },
+      })
+      const nextBanners = promoBanners.map((b, i) =>
+        i === index ? { ...b, mediaType: type, mediaUrl: url, image: url } : b
+      )
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sectionMedia: nextSection,
+          promoBanners: nextBanners,
+        }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Upload failed')
-      const url = data.uploaded?.url as string
-      const mediaType = (data.uploaded?.type as 'image' | 'video') || type
-      setPromoBanners((prev) =>
-        prev.map((b, i) =>
-          i === index
-            ? { ...b, mediaType, mediaUrl: url, image: url }
-            : b
-        )
-      )
+      if (!res.ok) throw new Error(data.error || 'Failed to save promo media')
+      setPromoBanners(normalizePromoBanners(data.promoBanners ?? nextBanners))
       if (data.sectionMedia) {
         setSectionMedia(mergeSectionMedia(data.sectionMedia))
         broadcastSectionMedia(mergeSectionMedia(data.sectionMedia))
       }
-      toast.success('Promo media uploaded')
+      toast.success('Promo media selected')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed')
+      toast.error(err instanceof Error ? err.message : 'Failed to save promo media')
     } finally {
       setUploadingPromoIndex(null)
     }
-  }
-
-  const onPromoFile = (index: number, e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    const type = promoBanners[index]?.mediaType === 'video' ? 'video' : 'image'
-    void uploadPromoMedia(index, file, type)
   }
 
   const clearPromoMedia = async (index: number) => {
@@ -343,15 +339,25 @@ export function AdminContentPage() {
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Upload media</Label>
+                    <Label>Media</Label>
                     <div className="flex flex-wrap gap-2">
-                      <Label
-                        htmlFor={`promo-upload-${index}`}
-                        className="inline-flex items-center gap-2 h-10 px-3 rounded-lg bg-slate-900 text-white text-sm font-medium cursor-pointer hover:bg-slate-800 w-fit"
-                      >
-                        <Upload className="h-3.5 w-3.5" />
-                        Choose file
-                      </Label>
+                      <MediaPickerButton
+                        label="Select / Upload"
+                        title={`Promo banner ${index + 1}`}
+                        folder="sections"
+                        accept={banner.mediaType === 'video' ? 'video' : 'image'}
+                        currentUrl={banner.mediaUrl}
+                        loading={uploadingPromoIndex === index}
+                        disabled={uploadingPromoIndex === index}
+                        className="h-10 bg-slate-900 hover:bg-slate-800 text-white"
+                        onSelect={(url, item) => {
+                          const type =
+                            item?.kind === 'video' || banner.mediaType === 'video'
+                              ? 'video'
+                              : 'image'
+                          void assignPromoMedia(index, url, type)
+                        }}
+                      />
                       <Button
                         type="button"
                         variant="outline"
@@ -364,18 +370,6 @@ export function AdminContentPage() {
                         Clear
                       </Button>
                     </div>
-                    <Input
-                      id={`promo-upload-${index}`}
-                      type="file"
-                      className="hidden"
-                      accept={
-                        banner.mediaType === 'video'
-                          ? 'video/mp4,video/webm,video/quicktime'
-                          : 'image/png,image/jpeg,image/webp'
-                      }
-                      onChange={(e) => onPromoFile(index, e)}
-                      disabled={uploadingPromoIndex === index}
-                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Link category slug</Label>

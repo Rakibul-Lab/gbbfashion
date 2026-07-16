@@ -22,6 +22,7 @@ type CollectionTab = 'bags' | 'shoes'
 type ApiProduct = {
   id: string
   name: string
+  slug?: string | null
   price: number
   originalPrice?: number | null
   image: string
@@ -38,6 +39,7 @@ type ColorVariant = { name: string; swatch: string; thumbnail: string }
 
 type PrimeCardProduct = {
   id: string
+  slug?: string | null
   name: string
   price: number
   originalPrice: number
@@ -74,6 +76,7 @@ function mapApiToCard(p: ApiProduct): PrimeCardProduct | null {
 
   return {
     id: p.id,
+    slug: p.slug,
     name: p.name,
     price: p.price,
     originalPrice: original,
@@ -160,7 +163,7 @@ function ProductCard({
         price: product.price,
       },
     })
-    goToProduct(product.id)
+    goToProduct({ id: product.id, slug: product.slug })
   }
 
   return (

@@ -29,6 +29,7 @@ const tabs: { value: ToteBackpackTab; label: string; category: string; subCatego
 type ApiProduct = {
   id: string
   name: string
+  slug?: string | null
   price: number
   originalPrice?: number | null
   image: string
@@ -81,7 +82,9 @@ function ProductCard({ product, index }: { product: ApiProduct; index: number })
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.05, ease: [0.25, 0.46, 0.45, 0.94] }}
       className={`snap-start ${productCardWidthClass} cursor-pointer`}
-      onClick={() => void openProduct({ id: product.id, name: product.name })}
+      onClick={() =>
+        void openProduct({ id: product.id, slug: product.slug, name: product.name })
+      }
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

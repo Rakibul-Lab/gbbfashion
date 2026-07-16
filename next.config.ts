@@ -42,7 +42,17 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, s-maxage=300, stale-while-revalidate=900',
+            value: 'no-store',
+          },
+        ],
+      },
+      {
+        // Fresh admin uploads must not be treated as immutable forever
+        source: '/uploads/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=60, must-revalidate',
           },
         ],
       },

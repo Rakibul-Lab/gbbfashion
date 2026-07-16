@@ -157,6 +157,7 @@ export function getCollectionJsonLd(slug?: string[]) {
 
 export function getProductJsonLd(product: {
   id: string
+  slug?: string | null
   name: string
   description: string
   price: number
@@ -164,6 +165,7 @@ export function getProductJsonLd(product: {
   category: string
   inStock: boolean
 }) {
+  const path = product.slug ? `/products/${product.slug}` : `/products/${product.id}`
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -174,7 +176,7 @@ export function getProductJsonLd(product: {
     category: product.category,
     offers: {
       '@type': 'Offer',
-      url: absoluteUrl(`/products/${product.id}`),
+      url: absoluteUrl(path),
       priceCurrency: 'USD',
       price: product.price,
       availability: product.inStock
@@ -212,6 +214,7 @@ export function getAllCollectionPaths(): string[] {
 
 export function getProductMetadata(product: {
   id: string
+  slug?: string | null
   name: string
   description: string
   image: string
@@ -227,18 +230,26 @@ export function getProductMetadata(product: {
   return buildPageMetadata({
     title,
     description,
-    path: `/products/${product.id}`,
+    path: product.slug ? `/products/${product.slug}` : `/products/${product.id}`,
     image: product.image,
   })
 }
 
-export function getProductBreadcrumbs(product: { id: string; name: string; category: string }) {
+export function getProductBreadcrumbs(product: {
+  id: string
+  slug?: string | null
+  name: string
+  category: string
+}) {
   const categoryLabel =
     navCategories.find((c) => c.value === product.category)?.label ?? product.category
 
   return getBreadcrumbJsonLd([
     { name: 'Home', path: '/' },
     { name: categoryLabel, path: `/collections/${product.category}` },
-    { name: product.name, path: `/products/${product.id}` },
+    {
+      name: product.name,
+      path: product.slug ? `/products/${product.slug}` : `/products/${product.id}`,
+    },
   ])
 }

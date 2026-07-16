@@ -23,6 +23,7 @@ type TrendTab = 'trend' | 'arrivals'
 type ApiProduct = {
   id: string
   name: string
+  slug?: string | null
   price: number
   originalPrice?: number | null
   image: string
@@ -66,7 +67,9 @@ function TrendProductCard({
       className="group relative snap-start w-full cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={() => void openProduct({ id: product.id, name: product.name })}
+      onClick={() =>
+        void openProduct({ id: product.id, slug: product.slug, name: product.name })
+      }
     >
       <div className={`${productImageContainerClass} mb-3 rounded-sm`}>
         <img

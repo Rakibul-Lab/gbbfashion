@@ -1,8 +1,8 @@
 'use client'
 
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
-import { ImageIcon, Loader2, Trash2, Upload, Video } from 'lucide-react'
+import { ImageIcon, Loader2, Trash2, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
@@ -12,8 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { MediaPickerButton } from '@/components/media-picker-button'
 import { broadcastSectionMedia } from '@/hooks/use-section-media'
 import {
+  mergeSectionMedia,
   sectionMediaGroups,
   type SectionMediaMap,
   type SectionMediaSlot,
@@ -26,37 +28,37 @@ type Props = {
 }
 
 export function AdminSectionMediaManager({ media, onChange }: Props) {
-  const [uploadingKey, setUploadingKey] = useState<string | null>(null)
+  const [savingKey, setSavingKey] = useState<string | null>(null)
   const [clearingKey, setClearingKey] = useState<string | null>(null)
   const [draftTypes, setDraftTypes] = useState<Record<string, SectionMediaType>>({})
-  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const groups = sectionMediaGroups()
 
   const getType = (key: string, slot: SectionMediaSlot): SectionMediaType =>
     draftTypes[key] || slot.type
 
-  const handleUpload = async (key: string, file: File, type: SectionMediaType) => {
-    setUploadingKey(key)
+  const assignSlot = async (key: string, url: string, type: SectionMediaType) => {
+    setSavingKey(key)
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('slot', key)
-      formData.append('type', type)
-      const res = await fetch('/api/settings/section-media', {
-        method: 'POST',
-        body: formData,
+      const nextLocal: SectionMediaMap = {
+        ...media,
+        [key]: { type, url },
+      }
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sectionMedia: mergeSectionMedia(nextLocal) }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Upload failed')
-      const next = data.sectionMedia as SectionMediaMap
+      if (!res.ok) throw new Error(data.error || 'Failed to save media')
+      const next = mergeSectionMedia(data.sectionMedia)
       onChange(next)
       broadcastSectionMedia(next)
-      toast.success('Media uploaded')
+      toast.success('Media selected')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed')
+      toast.error(err instanceof Error ? err.message : 'Failed to save media')
     } finally {
-      setUploadingKey(null)
+      setSavingKey(null)
     }
   }
 
@@ -79,19 +81,12 @@ export function AdminSectionMediaManager({ media, onChange }: Props) {
     }
   }
 
-  const onFileChange = (key: string, type: SectionMediaType, e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    void handleUpload(key, file, type)
-  }
-
   return (
     <div className="space-y-8">
       <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
         Every homepage and shop visual below supports <strong>Image</strong> or{' '}
-        <strong>Video</strong>. Choose the type, then upload. Leave a slot empty (or clear it) for a
-        blank area on the storefront — no stock images are filled in. Homepage hero is managed under
+        <strong>Video</strong>. Use the media library to pick existing files or upload new ones.
+        Leave a slot empty for a blank area — no stock images are filled in. Homepage hero is under
         Settings.
       </div>
 
@@ -107,9 +102,7 @@ export function AdminSectionMediaManager({ media, onChange }: Props) {
                 url: '',
               }
               const mediaType = getType(def.key, slot)
-              const uploading = uploadingKey === def.key
-              const clearing = clearingKey === def.key
-              const busy = uploading || clearing
+              const busy = savingKey === def.key || clearingKey === def.key
 
               return (
                 <div
@@ -189,16 +182,20 @@ export function AdminSectionMediaManager({ media, onChange }: Props) {
                         </Select>
                       </div>
 
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-9 bg-slate-900 hover:bg-slate-800 text-white"
+                      <MediaPickerButton
+                        label={`Select / Upload ${mediaType}`}
+                        title={`${def.label} — media library`}
+                        folder="sections"
+                        accept={mediaType === 'video' ? 'video' : 'image'}
+                        currentUrl={slot.url}
                         disabled={busy}
-                        onClick={() => inputRefs.current[def.key]?.click()}
-                      >
-                        <Upload className="h-3.5 w-3.5 mr-1.5" />
-                        Upload {mediaType}
-                      </Button>
+                        className="h-9 bg-slate-900 hover:bg-slate-800 text-white"
+                        onSelect={(url, item) => {
+                          const type: SectionMediaType =
+                            item?.kind === 'video' || mediaType === 'video' ? 'video' : 'image'
+                          void assignSlot(def.key, url, type)
+                        }}
+                      />
                       <Button
                         type="button"
                         size="sm"
@@ -210,19 +207,6 @@ export function AdminSectionMediaManager({ media, onChange }: Props) {
                         <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                         Clear
                       </Button>
-                      <input
-                        ref={(el) => {
-                          inputRefs.current[def.key] = el
-                        }}
-                        type="file"
-                        className="hidden"
-                        accept={
-                          mediaType === 'video'
-                            ? 'video/mp4,video/webm,video/quicktime'
-                            : 'image/png,image/jpeg,image/webp'
-                        }
-                        onChange={(e) => onFileChange(def.key, mediaType, e)}
-                      />
                     </div>
                   </div>
                 </div>

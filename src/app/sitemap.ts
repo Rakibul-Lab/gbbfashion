@@ -24,12 +24,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let productPages: MetadataRoute.Sitemap = []
   try {
     const products = await db.product.findMany({
-      select: { id: true, updatedAt: true },
+      select: { id: true, slug: true, updatedAt: true },
       orderBy: { updatedAt: 'desc' },
     })
 
     productPages = products.map((product) => ({
-      url: absoluteUrl(`/products/${product.id}`),
+      url: absoluteUrl(product.slug ? `/products/${product.slug}` : `/products/${product.id}`),
       lastModified: product.updatedAt,
       changeFrequency: 'weekly' as const,
       priority: 0.7,
