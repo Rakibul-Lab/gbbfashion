@@ -3266,7 +3266,7 @@ export function AdminDashboard() {
       }
       setSendingTestEmail(true)
       try {
-        const res = await fetch('/api/settings/invoice-email/send-test', {
+        const res = await fetch('/api/settings/invoice-email/test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

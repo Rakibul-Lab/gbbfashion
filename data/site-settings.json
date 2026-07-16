@@ -215,10 +215,10 @@
     "attachPdf": true
   },
   "maintenance": {
-    "enabled": true,
+    "enabled": false,
     "title": "We'll be back soon",
     "message": "GBB Fashion is undergoing scheduled maintenance to improve your shopping experience. Thank you for your patience.",
     "eta": ""
   },
-  "updatedAt": "2026-07-16T06:19:33.263Z"
+  "updatedAt": "2026-07-16T06:42:07.626Z"
 }
