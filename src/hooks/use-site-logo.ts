@@ -97,14 +97,15 @@ export function useSiteLogo() {
       if (!detail) return
       setBranding((prev) => {
         const next: SiteBranding = {
-          logoUrl: detail.logoUrl ?? prev.logoUrl,
+          logoUrl: detail.logoUrl !== undefined ? detail.logoUrl : prev.logoUrl,
           logoWidth: detail.logoWidth ?? prev.logoWidth,
           logoHeight: detail.logoHeight ?? prev.logoHeight,
           heroMediaType: detail.heroMediaType ?? prev.heroMediaType,
-          heroMediaUrl: detail.heroMediaUrl ?? prev.heroMediaUrl,
+          heroMediaUrl:
+            detail.heroMediaUrl !== undefined ? detail.heroMediaUrl : prev.heroMediaUrl,
         }
-        if (detail.logoUrl) {
-          queueMicrotask(() => applyFavicon(detail.logoUrl!))
+        if (detail.logoUrl !== undefined) {
+          queueMicrotask(() => applyFavicon(detail.logoUrl || ''))
         }
         return next
       })

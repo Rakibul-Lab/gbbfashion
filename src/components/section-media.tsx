@@ -24,7 +24,7 @@ export function SectionMedia({
     fit === 'fill' ? 'object-fill' : fit === 'contain' ? 'object-contain' : 'object-cover'
 
   if (!media?.url) {
-    return <div className={cn('bg-slate-200', className)} aria-hidden />
+    return null
   }
 
   if (media.type === 'video') {

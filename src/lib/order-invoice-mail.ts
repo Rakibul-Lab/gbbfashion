@@ -2,74 +2,100 @@ import { buildInvoicePdf, type InvoicePdfOrder } from '@/lib/invoice-pdf'
 import { sendMail } from '@/lib/mail'
 import { getSiteSettings } from '@/lib/site-settings'
 import { CURRENCIES, DEFAULT_CURRENCY_CODE } from '@/lib/currency'
+import {
+  applyInvoicePlaceholders,
+  normalizeInvoiceEmailSettings,
+  renderInvoiceEmailHtml,
+  renderInvoiceEmailText,
+  type InvoiceEmailSettings,
+  type InvoiceEmailVars,
+} from '@/lib/invoice-email-settings'
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
+function buildVars(
+  order: InvoicePdfOrder,
+  currencySymbol: string
+): InvoiceEmailVars {
+  return {
+    orderId: order.id,
+    customerName: order.customerName || 'there',
+    total: Number(order.totalAmount).toLocaleString(),
+    currencySymbol,
+  }
+}
+
 /** Email invoice PDF when the customer provided an email address. */
-export async function sendOrderInvoiceEmail(order: InvoicePdfOrder) {
-  const to = String(order.customerEmail || '').trim().toLowerCase()
+export async function sendOrderInvoiceEmail(
+  order: InvoicePdfOrder,
+  options?: {
+    /** Override recipient (admin test send) */
+    to?: string
+    /** Use these settings instead of saved (preview before save) */
+    invoiceEmail?: InvoiceEmailSettings
+  }
+) {
+  const to = String(options?.to || order.customerEmail || '')
+    .trim()
+    .toLowerCase()
   if (!to || !isValidEmail(to)) {
     return { ok: false as const, reason: 'No customer email' }
   }
 
   const settings = await getSiteSettings()
+  const invoiceEmail = normalizeInvoiceEmailSettings(
+    options?.invoiceEmail ?? settings.invoiceEmail
+  )
   const currency =
     CURRENCIES.find((c) => c.code === (settings.currencyCode || DEFAULT_CURRENCY_CODE)) ||
     CURRENCIES.find((c) => c.code === DEFAULT_CURRENCY_CODE)!
   const symbol = currency.symbol
+  const vars = buildVars(order, symbol)
 
-  const pdf = await buildInvoicePdf(order, symbol)
-  const filename = `GBB-Invoice-${order.id}.pdf`
+  const subject = applyInvoicePlaceholders(invoiceEmail.subject, vars)
+  const text = renderInvoiceEmailText(invoiceEmail, vars)
+  const html = renderInvoiceEmailHtml(invoiceEmail, vars)
 
-  const text = [
-    `Hi ${order.customerName || 'there'},`,
-    '',
-    `Thank you for your order with GBB Fashion.`,
-    `Invoice ID: ${order.id}`,
-    `Total: ${symbol}${Number(order.totalAmount).toLocaleString()}`,
-    '',
-    'Your invoice is attached as a PDF.',
-    '',
-    'GBB Fashion',
-    'www.gbbfashion.com',
-  ].join('\n')
-
-  const html = `
-    <div style="font-family:Georgia,serif;color:#0f172a;line-height:1.55">
-      <p>Hi ${escapeHtml(order.customerName || 'there')},</p>
-      <p>Thank you for your order with <strong>GBB Fashion</strong>.</p>
-      <p>
-        <strong>Invoice ID:</strong> ${escapeHtml(order.id)}<br/>
-        <strong>Total:</strong> ${escapeHtml(symbol)}${Number(order.totalAmount).toLocaleString()}
-      </p>
-      <p>Your invoice is attached as a PDF.</p>
-      <p style="margin-top:24px;color:#64748b;font-size:13px">
-        GBB Fashion · www.gbbfashion.com
-      </p>
-    </div>
-  `
+  const attachments = invoiceEmail.attachPdf
+    ? [
+        {
+          filename: `GBB-Invoice-${order.id}.pdf`,
+          content: await buildInvoicePdf(order, symbol),
+          contentType: 'application/pdf' as const,
+        },
+      ]
+    : undefined
 
   return sendMail({
     to,
-    subject: `Your GBB Fashion invoice ${order.id}`,
+    subject,
     text,
     html,
-    attachments: [
-      {
-        filename,
-        content: pdf,
-        contentType: 'application/pdf',
-      },
-    ],
+    attachments,
   })
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+/** Sample order used for admin test emails */
+export function buildSampleInvoiceOrder(toEmail: string): InvoicePdfOrder {
+  return {
+    id: `TEST-${Date.now().toString(36).toUpperCase()}`,
+    customerName: 'Test Customer',
+    customerEmail: toEmail,
+    customerPhone: '01700000000',
+    shippingAddress: '123 Test Street',
+    city: 'Dhaka',
+    state: 'Dhaka',
+    zipCode: '1200',
+    totalAmount: 2500,
+    status: 'pending',
+    paymentMethod: 'cod',
+    paymentStatus: 'unpaid',
+    createdAt: new Date().toISOString(),
+    items: [
+      { productName: 'Sample Handbag', quantity: 1, price: 2000 },
+      { productName: 'Sample Wallet', quantity: 1, price: 500 },
+    ],
+  }
 }

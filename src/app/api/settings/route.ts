@@ -9,6 +9,8 @@ import {
   type SectionMediaMap,
 } from '@/lib/site-settings'
 import { mergeSectionMedia } from '@/lib/section-media'
+import { normalizeInvoiceEmailSettings, type InvoiceEmailSettings } from '@/lib/invoice-email-settings'
+import { normalizeMaintenanceSettings, type MaintenanceSettings } from '@/lib/maintenance-settings'
 
 export async function GET() {
   try {
@@ -29,7 +31,7 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     const patch: Partial<SiteSettings> = {}
 
-    if (typeof body.logoUrl === 'string' && body.logoUrl.trim()) {
+    if (typeof body.logoUrl === 'string') {
       patch.logoUrl = body.logoUrl.trim()
     }
     if (body.logoWidth !== undefined && body.logoWidth !== null && body.logoWidth !== '') {
@@ -41,7 +43,7 @@ export async function PUT(request: NextRequest) {
     if (body.heroMediaType === 'image' || body.heroMediaType === 'video') {
       patch.heroMediaType = body.heroMediaType as HeroMediaType
     }
-    if (typeof body.heroMediaUrl === 'string' && body.heroMediaUrl.trim()) {
+    if (typeof body.heroMediaUrl === 'string') {
       patch.heroMediaUrl = body.heroMediaUrl.trim()
     }
     if (typeof body.currencyCode === 'string' && body.currencyCode.trim()) {
@@ -82,6 +84,16 @@ export async function PUT(request: NextRequest) {
     }
     if (body.sectionMedia && typeof body.sectionMedia === 'object') {
       patch.sectionMedia = mergeSectionMedia(body.sectionMedia as SectionMediaMap)
+    }
+    if (body.invoiceEmail && typeof body.invoiceEmail === 'object') {
+      patch.invoiceEmail = normalizeInvoiceEmailSettings(
+        body.invoiceEmail as InvoiceEmailSettings
+      )
+    }
+    if (body.maintenance && typeof body.maintenance === 'object') {
+      patch.maintenance = normalizeMaintenanceSettings(
+        body.maintenance as MaintenanceSettings
+      )
     }
 
     const settings = await saveSiteSettings(patch)

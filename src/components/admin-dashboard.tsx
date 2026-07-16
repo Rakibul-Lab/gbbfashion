@@ -86,6 +86,8 @@ import {
   MessageCircle,
   Banknote,
   Share2,
+  Mail,
+  Construction,
 } from 'lucide-react'
 import { OrderInvoiceDialog, type InvoiceOrder } from '@/components/order-invoice'
 import { AdminCategoriesPage } from '@/components/admin-categories-page'
@@ -112,6 +114,19 @@ import {
   WHATSAPP_ICON_PRESETS,
   type WhatsAppIconId,
 } from '@/lib/site-settings-client'
+import {
+  DEFAULT_INVOICE_EMAIL,
+  INVOICE_EMAIL_TEMPLATES,
+  normalizeInvoiceEmailSettings,
+  type InvoiceEmailSettings,
+  type InvoiceEmailTemplateId,
+} from '@/lib/invoice-email-settings'
+import {
+  DEFAULT_MAINTENANCE,
+  normalizeMaintenanceSettings,
+  type MaintenanceSettings,
+} from '@/lib/maintenance-settings'
+import { broadcastMaintenance } from '@/hooks/use-maintenance-mode'
 import { WhatsAppIconButton } from '@/components/whatsapp-icon'
 import {
   PAYMENT_METHODS,
@@ -352,7 +367,7 @@ export function AdminDashboard() {
 
   // Delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'product' | 'reel'; id: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'product' | 'reel' | 'order'; id: string } | null>(null)
 
   // ─── Data fetching ─────────────────────────────────────────────────────────
 
@@ -883,6 +898,24 @@ export function AdminDashboard() {
     }
   }
 
+  const handleDeleteOrder = async (id: string) => {
+    try {
+      const res = await fetch(`/api/orders/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      toast.success('Order deleted')
+      if (invoiceOrder?.id === id) setInvoiceOrder(null)
+      if (expandedOrder === id) setExpandedOrder(null)
+      setDraftOrderStatuses((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+      fetchOrders()
+    } catch {
+      toast.error('Failed to delete order')
+    }
+  }
+
   // ─── Logout ────────────────────────────────────────────────────────────────
 
   const handleLogout = async () => {
@@ -897,14 +930,16 @@ export function AdminDashboard() {
     if (!deleteTarget) return
     if (deleteTarget.type === 'product') {
       handleDeleteProduct(deleteTarget.id)
-    } else {
+    } else if (deleteTarget.type === 'reel') {
       handleDeleteReel(deleteTarget.id)
+    } else {
+      handleDeleteOrder(deleteTarget.id)
     }
     setDeleteDialogOpen(false)
     setDeleteTarget(null)
   }
 
-  const openDeleteDialog = (type: 'product' | 'reel', id: string) => {
+  const openDeleteDialog = (type: 'product' | 'reel' | 'order', id: string) => {
     setDeleteTarget({ type, id })
     setDeleteDialogOpen(true)
   }
@@ -1187,7 +1222,7 @@ export function AdminDashboard() {
           }
         }}
       >
-        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto p-0 gap-0">
+        <DialogContent className="w-[calc(100%-1.5rem)] max-w-[calc(100%-1.5rem)] sm:max-w-6xl lg:max-w-7xl max-h-[92vh] overflow-y-auto p-0 gap-0">
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
             <DialogTitle className="text-xl">
               {editingReel ? 'Edit reel' : 'Add new reel'}
@@ -2905,6 +2940,15 @@ export function AdminDashboard() {
                                   <FileText className="h-3.5 w-3.5" />
                                 </Button>
                               )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 rounded-lg px-2.5 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                title="Delete order"
+                                onClick={() => openDeleteDialog('order', order.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -3043,7 +3087,7 @@ export function AdminDashboard() {
   // ─── Settings Page ─────────────────────────────────────────────────────────
 
   function SettingsPage() {
-    const [logoUrl, setLogoUrl] = useState('/uploads/logo.png')
+    const [logoUrl, setLogoUrl] = useState('')
     const [logoWidth, setLogoWidth] = useState(36)
     const [logoHeight, setLogoHeight] = useState(36)
     const [widthInput, setWidthInput] = useState('36')
@@ -3055,7 +3099,7 @@ export function AdminDashboard() {
     const [loadingLogo, setLoadingLogo] = useState(true)
 
     const [heroMediaType, setHeroMediaType] = useState<'image' | 'video'>('image')
-    const [heroMediaUrl, setHeroMediaUrl] = useState('/hero-banner.jpg')
+    const [heroMediaUrl, setHeroMediaUrl] = useState('')
     const [heroUploadType, setHeroUploadType] = useState<'image' | 'video'>('image')
     const [heroFile, setHeroFile] = useState<File | null>(null)
     const [heroPreview, setHeroPreview] = useState<string | null>(null)
@@ -3072,6 +3116,14 @@ export function AdminDashboard() {
     const [instagramUrl, setInstagramUrl] = useState(DEFAULT_INSTAGRAM_URL)
     const [tiktokUrl, setTiktokUrl] = useState(DEFAULT_TIKTOK_URL)
     const [savingCommerce, setSavingCommerce] = useState(false)
+
+    const [invoiceEmail, setInvoiceEmail] = useState<InvoiceEmailSettings>(DEFAULT_INVOICE_EMAIL)
+    const [savingInvoiceEmail, setSavingInvoiceEmail] = useState(false)
+    const [testEmailTo, setTestEmailTo] = useState('')
+    const [sendingTestEmail, setSendingTestEmail] = useState(false)
+
+    const [maintenance, setMaintenance] = useState<MaintenanceSettings>(DEFAULT_MAINTENANCE)
+    const [savingMaintenance, setSavingMaintenance] = useState(false)
 
     const broadcastBranding = (next: {
       logoUrl?: string
@@ -3097,7 +3149,7 @@ export function AdminDashboard() {
       fetch('/api/settings', { cache: 'no-store' })
         .then((res) => res.json())
         .then((data) => {
-          if (data?.logoUrl) setLogoUrl(data.logoUrl)
+          if (typeof data?.logoUrl === 'string') setLogoUrl(data.logoUrl)
           const w =
             typeof data?.logoWidth === 'number'
               ? data.logoWidth
@@ -3115,7 +3167,7 @@ export function AdminDashboard() {
             setHeroMediaType(data.heroMediaType)
             setHeroUploadType(data.heroMediaType)
           }
-          if (data?.heroMediaUrl) setHeroMediaUrl(data.heroMediaUrl)
+          if (typeof data?.heroMediaUrl === 'string') setHeroMediaUrl(data.heroMediaUrl)
           if (typeof data?.currencyCode === 'string' && data.currencyCode) {
             setSelectedCurrency(data.currencyCode)
           }
@@ -3143,10 +3195,97 @@ export function AdminDashboard() {
           if (typeof data?.tiktokUrl === 'string') {
             setTiktokUrl(data.tiktokUrl)
           }
+          if (data?.invoiceEmail) {
+            setInvoiceEmail(normalizeInvoiceEmailSettings(data.invoiceEmail))
+          }
+          if (data?.maintenance) {
+            setMaintenance(normalizeMaintenanceSettings(data.maintenance))
+          }
         })
         .catch(() => undefined)
         .finally(() => setLoadingLogo(false))
     }, [])
+
+    const handleSaveMaintenance = async (next?: MaintenanceSettings) => {
+      const payload = normalizeMaintenanceSettings(next ?? maintenance)
+      setSavingMaintenance(true)
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ maintenance: payload }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          toast.error(data.error || 'Could not save maintenance settings')
+          return
+        }
+        const saved = normalizeMaintenanceSettings(data.maintenance)
+        setMaintenance(saved)
+        broadcastMaintenance(saved)
+        toast.success(
+          saved.enabled
+            ? 'Maintenance mode is ON — storefront shows the maintenance page'
+            : 'Maintenance mode is OFF — storefront is live'
+        )
+      } catch {
+        toast.error('Could not save maintenance settings')
+      } finally {
+        setSavingMaintenance(false)
+      }
+    }
+
+    const handleSaveInvoiceEmail = async () => {
+      setSavingInvoiceEmail(true)
+      try {
+        const payload = normalizeInvoiceEmailSettings(invoiceEmail)
+        const res = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoiceEmail: payload }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          toast.error(data.error || 'Could not save email template')
+          return
+        }
+        setInvoiceEmail(normalizeInvoiceEmailSettings(data.invoiceEmail))
+        toast.success('Invoice email settings saved')
+      } catch {
+        toast.error('Could not save email template')
+      } finally {
+        setSavingInvoiceEmail(false)
+      }
+    }
+
+    const handleTestInvoiceEmail = async () => {
+      const to = testEmailTo.trim()
+      if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+        toast.error('Enter a valid email address for the test send')
+        return
+      }
+      setSendingTestEmail(true)
+      try {
+        const res = await fetch('/api/settings/invoice-email/send-test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to,
+            invoiceEmail: normalizeInvoiceEmailSettings(invoiceEmail),
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          toast.error(data.error || 'Test email failed')
+          return
+        }
+        toast.success(data.message || `Test email sent to ${to}`)
+      } catch {
+        toast.error('Test email failed')
+      } finally {
+        setSendingTestEmail(false)
+      }
+    }
 
     const handleSaveCurrency = async (code: string) => {
       setSelectedCurrency(code)
@@ -3387,9 +3526,9 @@ export function AdminDashboard() {
           logoWidth: data.logoWidth ?? logoWidth,
           logoHeight: data.logoHeight ?? logoHeight,
         })
-        toast.success('Logo reset to default')
+        toast.success('Logo cleared')
       } catch {
-        toast.error('Reset failed')
+        toast.error('Clear failed')
       } finally {
         setUploading(false)
       }
@@ -3506,9 +3645,9 @@ export function AdminDashboard() {
           heroMediaType: data.heroMediaType,
           heroMediaUrl: data.heroMediaUrl,
         })
-        toast.success('Hero reset to default image')
+        toast.success('Hero media cleared')
       } catch {
-        toast.error('Reset failed')
+        toast.error('Clear failed')
       } finally {
         setUploadingHero(false)
       }
@@ -3522,9 +3661,119 @@ export function AdminDashboard() {
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Settings</h2>
           <p className="text-slate-500 text-sm mt-1">
-            Manage currency, WhatsApp, delivery charges, branding, and homepage hero
+            Manage maintenance mode, currency, invoice emails, WhatsApp, delivery, and branding
           </p>
         </div>
+
+        <Card
+          className={`rounded-xl border-slate-200 ${
+            maintenance.enabled ? 'border-amber-300 bg-amber-50/40' : ''
+          }`}
+        >
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Construction className="h-5 w-5 text-amber-600" />
+              Maintenance mode
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  {maintenance.enabled ? 'Storefront is offline' : 'Storefront is live'}
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  When on, visitors see the maintenance template. Staff can still sign in at{' '}
+                  <span className="font-medium">/login</span>, then open{' '}
+                  <span className="font-medium">/admin</span>.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <Switch
+                  checked={maintenance.enabled}
+                  disabled={savingMaintenance}
+                  onCheckedChange={(v) => {
+                    const next = { ...maintenance, enabled: v }
+                    setMaintenance(next)
+                    void handleSaveMaintenance(next)
+                  }}
+                />
+                <span
+                  className={`text-sm font-semibold ${
+                    maintenance.enabled ? 'text-amber-700' : 'text-emerald-700'
+                  }`}
+                >
+                  {maintenance.enabled ? 'ON' : 'OFF'}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="maint-title">Headline</Label>
+              <Input
+                id="maint-title"
+                value={maintenance.title}
+                onChange={(e) =>
+                  setMaintenance((prev) => ({ ...prev, title: e.target.value }))
+                }
+                placeholder="We'll be back soon"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="maint-message">Message</Label>
+              <Textarea
+                id="maint-message"
+                rows={4}
+                value={maintenance.message}
+                onChange={(e) =>
+                  setMaintenance((prev) => ({ ...prev, message: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="maint-eta">Expected return (optional)</Label>
+              <Input
+                id="maint-eta"
+                value={maintenance.eta}
+                onChange={(e) =>
+                  setMaintenance((prev) => ({ ...prev, eta: e.target.value }))
+                }
+                placeholder="e.g. Tomorrow 10:00 AM"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={() => void handleSaveMaintenance()}
+                disabled={savingMaintenance}
+                className="bg-slate-900 hover:bg-slate-800 text-white"
+              >
+                {savingMaintenance ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save message
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={savingMaintenance}
+                onClick={() =>
+                  setMaintenance((prev) => ({
+                    ...DEFAULT_MAINTENANCE,
+                    enabled: prev.enabled,
+                  }))
+                }
+              >
+                Reset copy
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="rounded-xl border-slate-200">
           <CardHeader>
@@ -3563,6 +3812,165 @@ export function AdminDashboard() {
               </span>
               <span className="text-slate-500">Preview · 1,250 displayed as store price</span>
               {savingCurrency && <Loader2 className="h-4 w-4 animate-spin text-slate-400 ml-auto" />}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl border-slate-200">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Mail className="h-5 w-5 text-sky-600" />
+              Order invoice emails
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <p className="text-sm text-slate-500">
+              Choose a layout, edit the copy, then save. Orders always complete even if email fails.
+              Placeholders: {'{{orderId}}'}, {'{{customerName}}'}, {'{{total}}'},{' '}
+              {'{{currencySymbol}}'}
+            </p>
+
+            <div className="space-y-2">
+              <Label>Email template</Label>
+              <Select
+                value={invoiceEmail.templateId}
+                onValueChange={(v) =>
+                  setInvoiceEmail((prev) => ({
+                    ...prev,
+                    templateId: v as InvoiceEmailTemplateId,
+                  }))
+                }
+              >
+                <SelectTrigger className="w-full max-w-md">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {INVOICE_EMAIL_TEMPLATES.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500">
+                {
+                  INVOICE_EMAIL_TEMPLATES.find((t) => t.id === invoiceEmail.templateId)
+                    ?.description
+                }
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invoice-email-subject">Subject</Label>
+              <Input
+                id="invoice-email-subject"
+                value={invoiceEmail.subject}
+                onChange={(e) =>
+                  setInvoiceEmail((prev) => ({ ...prev, subject: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invoice-email-greeting">Greeting</Label>
+              <Input
+                id="invoice-email-greeting"
+                value={invoiceEmail.greeting}
+                onChange={(e) =>
+                  setInvoiceEmail((prev) => ({ ...prev, greeting: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invoice-email-body">Body</Label>
+              <Textarea
+                id="invoice-email-body"
+                rows={6}
+                value={invoiceEmail.body}
+                onChange={(e) =>
+                  setInvoiceEmail((prev) => ({ ...prev, body: e.target.value }))
+                }
+                className="font-mono text-sm"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invoice-email-footer">Footer</Label>
+              <Input
+                id="invoice-email-footer"
+                value={invoiceEmail.footerText}
+                onChange={(e) =>
+                  setInvoiceEmail((prev) => ({ ...prev, footerText: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={invoiceEmail.attachPdf}
+                onCheckedChange={(v) =>
+                  setInvoiceEmail((prev) => ({ ...prev, attachPdf: v }))
+                }
+              />
+              <Label>Attach invoice PDF</Label>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={() => void handleSaveInvoiceEmail()}
+                disabled={savingInvoiceEmail}
+                className="bg-slate-900 hover:bg-slate-800 text-white"
+              >
+                {savingInvoiceEmail ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save email settings
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setInvoiceEmail(DEFAULT_INVOICE_EMAIL)}
+                disabled={savingInvoiceEmail || sendingTestEmail}
+              >
+                Reset to defaults
+              </Button>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <Label htmlFor="invoice-test-to">Send test email</Label>
+              <p className="text-xs text-slate-500">
+                Uses the form above (even if not saved yet) and a sample order. Requires SMTP
+                credentials in the server environment.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 max-w-xl">
+                <Input
+                  id="invoice-test-to"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={testEmailTo}
+                  onChange={(e) => setTestEmailTo(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0"
+                  disabled={sendingTestEmail}
+                  onClick={() => void handleTestInvoiceEmail()}
+                >
+                  {sendingTestEmail ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Mail className="h-4 w-4 mr-2" />
+                  )}
+                  Send test
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -3807,12 +4215,16 @@ export function AdminDashboard() {
                   <div className="h-full w-full flex items-center justify-center">
                     <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
                   </div>
-                ) : (
+                ) : displayLogo ? (
                   <img
                     src={displayLogo}
                     alt="Site logo preview"
                     className="absolute inset-0 h-full w-full object-contain object-center p-1"
                   />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-[10px] text-slate-400 px-2 text-center">
+                    No logo
+                  </div>
                 )}
               </div>
 
@@ -3844,10 +4256,10 @@ export function AdminDashboard() {
                   <Button
                     variant="outline"
                     onClick={handleReset}
-                    disabled={uploading}
+                    disabled={uploading || !logoUrl}
                   >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Reset Default
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear Logo
                   </Button>
                 </div>
               </div>
@@ -3950,28 +4362,34 @@ export function AdminDashboard() {
             </div>
 
             <div className="relative w-full aspect-video overflow-hidden rounded-xl border border-slate-200 bg-slate-900">
-              {((heroPreview && heroFile?.type.startsWith('video/')) ||
+              {displayHero ? (
+                ((heroPreview && heroFile?.type.startsWith('video/')) ||
                 (!heroPreview && heroMediaType === 'video')) ? (
-                <video
-                  key={displayHero}
-                  src={displayHero}
-                  className="absolute inset-0 h-full w-full object-cover"
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload="auto"
-                />
+                  <video
+                    key={displayHero}
+                    src={displayHero}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="auto"
+                  />
+                ) : (
+                  <img
+                    key={displayHero}
+                    src={displayHero}
+                    alt="Hero preview"
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                )
               ) : (
-                <img
-                  key={displayHero}
-                  src={displayHero}
-                  alt="Hero preview"
-                  className="absolute inset-0 h-full w-full object-cover"
-                />
+                <div className="absolute inset-0 flex items-center justify-center text-sm text-white/50">
+                  No hero media
+                </div>
               )}
               <div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
-                Current: {heroMediaType}
+                Current: {displayHero ? heroMediaType : 'empty'}
               </div>
             </div>
 
@@ -4008,10 +4426,10 @@ export function AdminDashboard() {
               <Button
                 variant="outline"
                 onClick={handleHeroReset}
-                disabled={uploadingHero}
+                disabled={uploadingHero || !heroMediaUrl}
               >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Reset Default
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear Hero
               </Button>
             </div>
           </CardContent>

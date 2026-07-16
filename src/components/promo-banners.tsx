@@ -49,8 +49,9 @@ export function PromoBanners() {
         const slotKey = banner.id === 'prime' || index === 0 ? 'promo_prime' : 'promo_second'
         const slot = get(slotKey)
         const media = {
-          type: slot.url ? slot.type : banner.mediaType,
-          url: slot.url || banner.mediaUrl || banner.image,
+          type: (slot.url ? slot.type : banner.mediaType) as 'image' | 'video',
+          // Prefer section-media slot; never fall back to stock banner paths
+          url: slot.url || '',
         }
         const alignRight = index % 2 === 1
         const baseDelay = 0.08

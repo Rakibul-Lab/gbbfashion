@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from 'react'
 import { toast } from 'sonner'
-import { ImageIcon, Loader2, Upload, Video } from 'lucide-react'
+import { ImageIcon, Loader2, Trash2, Upload, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
@@ -27,6 +27,7 @@ type Props = {
 
 export function AdminSectionMediaManager({ media, onChange }: Props) {
   const [uploadingKey, setUploadingKey] = useState<string | null>(null)
+  const [clearingKey, setClearingKey] = useState<string | null>(null)
   const [draftTypes, setDraftTypes] = useState<Record<string, SectionMediaType>>({})
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -59,6 +60,25 @@ export function AdminSectionMediaManager({ media, onChange }: Props) {
     }
   }
 
+  const handleClear = async (key: string) => {
+    setClearingKey(key)
+    try {
+      const res = await fetch(`/api/settings/section-media?slot=${encodeURIComponent(key)}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Clear failed')
+      const next = data.sectionMedia as SectionMediaMap
+      onChange(next)
+      broadcastSectionMedia(next)
+      toast.success('Media cleared')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Clear failed')
+    } finally {
+      setClearingKey(null)
+    }
+  }
+
   const onFileChange = (key: string, type: SectionMediaType, e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -70,8 +90,9 @@ export function AdminSectionMediaManager({ media, onChange }: Props) {
     <div className="space-y-8">
       <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
         Every homepage and shop visual below supports <strong>Image</strong> or{' '}
-        <strong>Video</strong>. Choose the type, then upload. Changes appear on the storefront
-        immediately. Homepage hero is managed under Settings.
+        <strong>Video</strong>. Choose the type, then upload. Leave a slot empty (or clear it) for a
+        blank area on the storefront — no stock images are filled in. Homepage hero is managed under
+        Settings.
       </div>
 
       {groups.map(({ group, slots }) => (
@@ -83,10 +104,12 @@ export function AdminSectionMediaManager({ media, onChange }: Props) {
             {slots.map((def) => {
               const slot = media[def.key] || {
                 type: 'image' as const,
-                url: def.defaultUrl,
+                url: '',
               }
               const mediaType = getType(def.key, slot)
               const uploading = uploadingKey === def.key
+              const clearing = clearingKey === def.key
+              const busy = uploading || clearing
 
               return (
                 <div
@@ -113,11 +136,12 @@ export function AdminSectionMediaManager({ media, onChange }: Props) {
                         />
                       )
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-slate-300">
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-slate-300">
                         <ImageIcon className="h-10 w-10" />
+                        <span className="text-xs text-slate-400">No media</span>
                       </div>
                     )}
-                    {uploading && (
+                    {busy && (
                       <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
                         <Loader2 className="h-7 w-7 animate-spin text-slate-700" />
                       </div>
@@ -129,7 +153,7 @@ export function AdminSectionMediaManager({ media, onChange }: Props) {
                         ) : (
                           <ImageIcon className="h-3 w-3" />
                         )}
-                        {slot.type}
+                        {slot.url ? slot.type : 'empty'}
                       </span>
                     </div>
                   </div>
@@ -169,11 +193,22 @@ export function AdminSectionMediaManager({ media, onChange }: Props) {
                         type="button"
                         size="sm"
                         className="h-9 bg-slate-900 hover:bg-slate-800 text-white"
-                        disabled={uploading}
+                        disabled={busy}
                         onClick={() => inputRefs.current[def.key]?.click()}
                       >
                         <Upload className="h-3.5 w-3.5 mr-1.5" />
                         Upload {mediaType}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-9"
+                        disabled={busy || !slot.url}
+                        onClick={() => void handleClear(def.key)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                        Clear
                       </Button>
                       <input
                         ref={(el) => {

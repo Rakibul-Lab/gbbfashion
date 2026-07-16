@@ -13,22 +13,16 @@ interface CategoryHeroProps {
 
 function HeroProductMedia({
   media,
-  fallbackSrc,
   alt,
   className,
   delay = 0,
 }: {
   media?: SectionMediaSlot
-  fallbackSrc?: string
   alt: string
   className?: string
   delay?: number
 }) {
-  const slot: SectionMediaSlot = media?.url
-    ? media
-    : { type: 'image', url: fallbackSrc || '' }
-
-  if (!slot.url) return null
+  if (!media?.url) return null
 
   return (
     <motion.div
@@ -37,13 +31,12 @@ function HeroProductMedia({
       transition={{ duration: 0.7, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
       className={`relative ${className ?? ''}`}
     >
-      <SectionMediaFill media={slot} alt={alt} fit="fill" priority={delay === 0} />
+      <SectionMediaFill media={media} alt={alt} fit="fill" priority={delay === 0} />
     </motion.div>
   )
 }
 
 export function CategoryHero({ config, leftMedia, rightMedia }: CategoryHeroProps) {
-  const centerFallback = config.heroImageLeft ?? config.heroImageRight
   const centerMedia = leftMedia?.url ? leftMedia : rightMedia
 
   return (
@@ -78,7 +71,6 @@ export function CategoryHero({ config, leftMedia, rightMedia }: CategoryHeroProp
         <div className="relative flex items-center justify-center min-h-[260px] sm:min-h-[320px] md:min-h-[380px] py-10 md:py-14">
           <HeroProductMedia
             media={leftMedia}
-            fallbackSrc={config.heroImageLeft}
             alt=""
             delay={0.15}
             className="hidden md:block absolute left-0 lg:left-4 bottom-6 w-[140px] lg:w-[180px] xl:w-[220px] aspect-square"
@@ -109,14 +101,12 @@ export function CategoryHero({ config, leftMedia, rightMedia }: CategoryHeroProp
 
             <HeroProductMedia
               media={centerMedia}
-              fallbackSrc={centerFallback}
               alt=""
               delay={0.3}
               className="mx-auto mt-6 w-[72px] sm:w-[88px] md:w-[100px] aspect-square md:hidden"
             />
             <HeroProductMedia
               media={centerMedia}
-              fallbackSrc={centerFallback}
               alt=""
               delay={0.35}
               className="hidden md:block mx-auto mt-8 w-[90px] lg:w-[110px] aspect-square"
@@ -125,7 +115,6 @@ export function CategoryHero({ config, leftMedia, rightMedia }: CategoryHeroProp
 
           <HeroProductMedia
             media={rightMedia}
-            fallbackSrc={config.heroImageRight}
             alt=""
             delay={0.2}
             className="hidden md:block absolute right-0 lg:right-4 bottom-8 w-[150px] lg:w-[190px] xl:w-[230px] aspect-[4/5]"

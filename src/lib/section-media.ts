@@ -223,26 +223,52 @@ export const SECTION_MEDIA_SLOTS: SectionMediaSlotDef[] = [
 
 export type SectionMediaMap = Record<string, SectionMediaSlot>
 
+/** Empty map for all slots — never prefill stock images. */
 export function defaultSectionMedia(): SectionMediaMap {
   const map: SectionMediaMap = {}
   for (const slot of SECTION_MEDIA_SLOTS) {
     map[slot.key] = {
       type: slot.defaultType || 'image',
-      url: slot.defaultUrl,
+      url: '',
     }
   }
   return map
 }
 
+/** True when URL is a built-in public stock asset (not an admin upload). */
+export function isStockSectionMediaUrl(_key: string, url: string): boolean {
+  const clean = url.split('?')[0]
+  if (!clean || clean.startsWith('/uploads/')) return false
+  if (/^https?:\/\//i.test(clean)) return false
+  // Any leftover public path (e.g. /banner-*.png) is treated as blank stock art
+  return true
+}
+
+/** Keep uploads/remote URLs; clear legacy public stock paths. */
+export function keepUploadedMediaUrl(url: string): string {
+  const trimmed = typeof url === 'string' ? url.trim() : ''
+  if (!trimmed) return ''
+  if (isStockSectionMediaUrl('', trimmed)) return ''
+  return trimmed
+}
+
+/**
+ * Merge saved section media.
+ * Empty string is preserved (blank on storefront).
+ * Missing keys start blank. Stock public defaults are treated as blank.
+ */
 export function mergeSectionMedia(saved?: SectionMediaMap | null): SectionMediaMap {
-  const defaults = defaultSectionMedia()
-  if (!saved || typeof saved !== 'object') return defaults
-  const next: SectionMediaMap = { ...defaults }
+  const next = defaultSectionMedia()
+  if (!saved || typeof saved !== 'object') return next
+
   for (const slot of SECTION_MEDIA_SLOTS) {
     const row = saved[slot.key]
     if (!row || typeof row !== 'object') continue
     const type: SectionMediaType = row.type === 'video' ? 'video' : 'image'
-    const url = typeof row.url === 'string' && row.url.trim() ? row.url.trim() : defaults[slot.key].url
+    let url = typeof row.url === 'string' ? row.url.trim() : ''
+    if (url && isStockSectionMediaUrl(slot.key, url)) {
+      url = ''
+    }
     next[slot.key] = { type, url }
   }
   return next

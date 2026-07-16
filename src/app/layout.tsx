@@ -36,14 +36,19 @@ export async function generateMetadata(): Promise<Metadata> {
   const iconUrl = settings.logoUrl || '/uploads/logo.png'
   const iconType = mimeFromUrl(iconUrl)
   const faviconHref = `/api/favicon?v=${encodeURIComponent(iconUrl)}`
+  const maintenanceOn = settings.maintenance?.enabled === true
 
   return {
     metadataBase: new URL(siteConfig.url),
     title: {
-      default: siteConfig.title,
+      default: maintenanceOn
+        ? `${siteConfig.name} — Under maintenance`
+        : siteConfig.title,
       template: `%s | ${siteConfig.name}`,
     },
-    description: siteConfig.description,
+    description: maintenanceOn
+      ? settings.maintenance.message || siteConfig.description
+      : siteConfig.description,
     keywords: siteConfig.keywords,
     authors: [{ name: siteConfig.name }],
     creator: siteConfig.name,
@@ -56,9 +61,13 @@ export async function generateMetadata(): Promise<Metadata> {
       apple: [{ url: faviconHref, type: iconType }],
     },
     robots: {
-      index: true,
-      follow: true,
-      googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
+      index: !maintenanceOn,
+      follow: !maintenanceOn,
+      googleBot: {
+        index: !maintenanceOn,
+        follow: !maintenanceOn,
+        'max-image-preview': 'large',
+      },
     },
     openGraph: {
       type: 'website',

@@ -7,7 +7,7 @@ export type MailAttachment = {
   contentType?: string
 }
 
-function smtpConfigured() {
+export function smtpConfigured() {
   return Boolean(
     process.env.SMTP_HOST &&
       process.env.SMTP_USER &&

@@ -198,12 +198,13 @@ Add each name/value (**no quotes** around values):
 | `SSLCOMMERZ_STORE_PASSWORD` | store password |
 | `SSLCOMMERZ_IS_LIVE` | `false` (or `true` for live) |
 | `NEXT_PUBLIC_SSLCOMMERZ_IS_LIVE` | `false` (or `true`) |
-| `SMTP_HOST` | `mail.gbbfashion.com` |
-| `SMTP_PORT` | `465` |
-| `SMTP_SECURE` | `true` |
+| `SMTP_HOST` | `sapphire.premium.hostns.io` |
+| `SMTP_PORT` | `465` (or `587`) |
+| `SMTP_SECURE` | `true` for 465 / `false` for 587 |
 | `SMTP_USER` | `admin@gbbfashion.com` |
 | `SMTP_PASS` | mailbox password |
 | `SMTP_FROM` | `GBB Fashion <admin@gbbfashion.com>` |
+| `SMTP_TLS_REJECT_UNAUTHORIZED` | `false` if TLS errors on shared host |
 | `NODE_ENV` | `production` |
 
 ### B) File `.env` next to `server.js`
@@ -219,14 +220,16 @@ SSLCOMMERZ_STORE_ID=testbox
 SSLCOMMERZ_STORE_PASSWORD=qwerty
 SSLCOMMERZ_IS_LIVE=false
 NEXT_PUBLIC_SSLCOMMERZ_IS_LIVE=false
-SMTP_HOST=mail.gbbfashion.com
+SMTP_HOST=sapphire.premium.hostns.io
 SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=admin@gbbfashion.com
 SMTP_PASS=your-mail-password
 SMTP_FROM="GBB Fashion <admin@gbbfashion.com>"
+SMTP_TLS_REJECT_UNAUTHORIZED=false
 ```
 
+Orders always complete first. Invoice email is sent in the background when SMTP connects; if mail fails, the order is still placed.
 ### C) `.htaccess` (document root / Passenger config)
 
 Ensure `.htaccess` for the domain includes Passenger config. Typical:

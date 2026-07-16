@@ -33,6 +33,16 @@ import {
   type WhatsAppIconId,
 } from '@/lib/site-settings-client'
 import {
+  DEFAULT_INVOICE_EMAIL,
+  normalizeInvoiceEmailSettings,
+  type InvoiceEmailSettings,
+} from '@/lib/invoice-email-settings'
+import {
+  DEFAULT_MAINTENANCE,
+  normalizeMaintenanceSettings,
+  type MaintenanceSettings,
+} from '@/lib/maintenance-settings'
+import {
   mergeSectionMedia,
   type SectionMediaMap,
 } from '@/lib/section-media'
@@ -73,6 +83,21 @@ export {
 } from '@/lib/site-settings-client'
 
 export {
+  DEFAULT_INVOICE_EMAIL,
+  INVOICE_EMAIL_TEMPLATES,
+  normalizeInvoiceEmailSettings,
+  normalizeInvoiceEmailTemplateId,
+  type InvoiceEmailSettings,
+  type InvoiceEmailTemplateId,
+} from '@/lib/invoice-email-settings'
+
+export {
+  DEFAULT_MAINTENANCE,
+  normalizeMaintenanceSettings,
+  type MaintenanceSettings,
+} from '@/lib/maintenance-settings'
+
+export {
   mergeSectionMedia,
   defaultSectionMedia,
   type SectionMediaMap,
@@ -99,6 +124,8 @@ export type SiteSettings = {
   promoBanners: PromoBannerConfig[]
   homepageSections: HomepageSectionConfig[]
   sectionMedia: SectionMediaMap
+  invoiceEmail: InvoiceEmailSettings
+  maintenance: MaintenanceSettings
   updatedAt?: string
 }
 
@@ -125,12 +152,22 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     const raw = await fs.readFile(settingsPath, 'utf8')
     const parsed = JSON.parse(raw) as Partial<SiteSettings> & { logoSize?: number }
     const legacy = typeof parsed.logoSize === 'number' ? parsed.logoSize : undefined
+    const sanitizeBrandUrl = (value: unknown) => {
+      const raw = typeof value === 'string' ? value.trim() : ''
+      if (!raw) return ''
+      const clean = raw.split('?')[0]
+      if (clean.startsWith('/uploads/')) return raw
+      if (/^https?:\/\//i.test(clean)) return raw
+      // Legacy stock public assets (e.g. /logo.svg, /hero-banner.jpg)
+      return ''
+    }
+
     return {
-      logoUrl: parsed.logoUrl || DEFAULT_LOGO_URL,
+      logoUrl: sanitizeBrandUrl(parsed.logoUrl),
       logoWidth: clampLogoDim(parsed.logoWidth ?? legacy ?? DEFAULT_LOGO_WIDTH, DEFAULT_LOGO_WIDTH),
       logoHeight: clampLogoDim(parsed.logoHeight ?? legacy ?? DEFAULT_LOGO_HEIGHT, DEFAULT_LOGO_HEIGHT),
       heroMediaType: normalizeHeroType(parsed.heroMediaType),
-      heroMediaUrl: parsed.heroMediaUrl || DEFAULT_HERO_MEDIA_URL,
+      heroMediaUrl: sanitizeBrandUrl(parsed.heroMediaUrl),
       currencyCode:
         typeof parsed.currencyCode === 'string' && parsed.currencyCode.trim()
           ? parsed.currencyCode.trim().toUpperCase()
@@ -171,15 +208,17 @@ export async function getSiteSettings(): Promise<SiteSettings> {
           ? (parsed.sectionMedia as SectionMediaMap)
           : null
       ),
+      invoiceEmail: normalizeInvoiceEmailSettings(parsed.invoiceEmail),
+      maintenance: normalizeMaintenanceSettings(parsed.maintenance),
       updatedAt: parsed.updatedAt,
     }
   } catch {
     return {
-      logoUrl: DEFAULT_LOGO_URL,
+      logoUrl: '',
       logoWidth: DEFAULT_LOGO_WIDTH,
       logoHeight: DEFAULT_LOGO_HEIGHT,
       heroMediaType: DEFAULT_HERO_MEDIA_TYPE,
-      heroMediaUrl: DEFAULT_HERO_MEDIA_URL,
+      heroMediaUrl: '',
       currencyCode: DEFAULT_CURRENCY_CODE,
       whatsappNumber: DEFAULT_WHATSAPP_NUMBER,
       whatsappIconId: DEFAULT_WHATSAPP_ICON_ID,
@@ -193,6 +232,8 @@ export async function getSiteSettings(): Promise<SiteSettings> {
       promoBanners: normalizePromoBanners(null),
       homepageSections: mergeHomepageSections(null),
       sectionMedia: mergeSectionMedia(null),
+      invoiceEmail: DEFAULT_INVOICE_EMAIL,
+      maintenance: DEFAULT_MAINTENANCE,
     }
   }
 }
@@ -257,6 +298,12 @@ export async function saveSiteSettings(patch: Partial<SiteSettings>): Promise<Si
       patch.homepageSections ?? current.homepageSections
     ),
     sectionMedia: mergeSectionMedia(patch.sectionMedia ?? current.sectionMedia),
+    invoiceEmail: normalizeInvoiceEmailSettings(
+      patch.invoiceEmail ?? current.invoiceEmail
+    ),
+    maintenance: normalizeMaintenanceSettings(
+      patch.maintenance ?? current.maintenance
+    ),
     updatedAt: new Date().toISOString(),
   }
   await fs.writeFile(settingsPath, JSON.stringify(next, null, 2), 'utf8')

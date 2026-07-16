@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
 import {
-  DEFAULT_LOGO_URL,
   ensureSiteDirs,
   getSiteSettings,
   getUploadsDir,
@@ -79,10 +78,10 @@ export async function DELETE() {
         .map((name) => fs.unlink(path.join(uploadsDir, name)).catch(() => undefined))
     )
 
-    const settings = await saveSiteSettings({ logoUrl: DEFAULT_LOGO_URL })
-    return NextResponse.json({ ...settings, message: 'Logo reset to default' })
+    const settings = await saveSiteSettings({ logoUrl: '' })
+    return NextResponse.json({ ...settings, message: 'Logo cleared' })
   } catch (error) {
     console.error('Logo reset error:', error)
-    return NextResponse.json({ error: 'Failed to reset logo' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to clear logo' }, { status: 500 })
   }
 }

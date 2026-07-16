@@ -27,7 +27,9 @@ export function HeroSection() {
         .then((data) => {
           if (cancelled || !data) return
           setMediaType(data.heroMediaType === 'video' ? 'video' : 'image')
-          setMediaUrl(data.heroMediaUrl || DEFAULT_HERO_MEDIA_URL)
+          setMediaUrl(
+            typeof data.heroMediaUrl === 'string' ? data.heroMediaUrl : DEFAULT_HERO_MEDIA_URL
+          )
         })
         .catch(() => undefined)
     }
@@ -35,10 +37,11 @@ export function HeroSection() {
     load()
 
     const onUpdated = (event: Event) => {
-      const detail = (event as CustomEvent<{ heroMediaType?: HeroMediaType; heroMediaUrl?: string }>).detail
+      const detail = (event as CustomEvent<{ heroMediaType?: HeroMediaType; heroMediaUrl?: string }>)
+        .detail
       if (!detail) return
       if (detail.heroMediaType) setMediaType(detail.heroMediaType)
-      if (detail.heroMediaUrl) setMediaUrl(detail.heroMediaUrl)
+      if (detail.heroMediaUrl !== undefined) setMediaUrl(detail.heroMediaUrl)
     }
 
     window.addEventListener('site-settings-updated', onUpdated as EventListener)
@@ -50,7 +53,7 @@ export function HeroSection() {
 
   // Keep hero video playing continuously (autoplay + loop; resume if interrupted)
   useEffect(() => {
-    if (mediaType !== 'video') return
+    if (mediaType !== 'video' || !mediaUrl) return
     const video = videoRef.current
     if (!video) return
 
@@ -88,29 +91,31 @@ export function HeroSection() {
   return (
     <section className="relative w-full overflow-hidden">
       <div className="relative w-full h-[55dvh] sm:h-[70dvh] lg:h-[min(100dvh,900px)] min-h-[280px] sm:min-h-[400px] max-h-[900px] bg-slate-900">
-        {mediaType === 'video' ? (
-          <video
-            key={mediaUrl}
-            ref={videoRef}
-            src={mediaUrl}
-            className="absolute inset-0 h-full w-full object-cover object-center pointer-events-none"
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="auto"
-            controls={false}
-            disablePictureInPicture
-            aria-label="GBB Fashion hero video"
-          />
-        ) : (
-          <img
-            key={mediaUrl}
-            src={mediaUrl}
-            alt="GBB Fashion hero"
-            className="absolute inset-0 h-full w-full object-cover object-center"
-          />
-        )}
+        {mediaUrl ? (
+          mediaType === 'video' ? (
+            <video
+              key={mediaUrl}
+              ref={videoRef}
+              src={mediaUrl}
+              className="absolute inset-0 h-full w-full object-cover object-center pointer-events-none"
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
+              controls={false}
+              disablePictureInPicture
+              aria-label="GBB Fashion hero video"
+            />
+          ) : (
+            <img
+              key={mediaUrl}
+              src={mediaUrl}
+              alt="GBB Fashion hero"
+              className="absolute inset-0 h-full w-full object-cover object-center"
+            />
+          )
+        ) : null}
       </div>
 
       <div className="bg-slate-900 text-white">

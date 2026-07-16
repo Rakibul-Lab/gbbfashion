@@ -2,11 +2,14 @@
 
 import { Suspense, useEffect, useLayoutEffect, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { enableStorePersistWrites, useStore } from '@/lib/store'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { WhatsAppFloat } from '@/components/whatsapp-float'
 import { AuthGuard } from '@/components/auth-guard'
+import { MaintenanceScreen } from '@/components/maintenance-screen'
+import { useMaintenanceMode } from '@/hooks/use-maintenance-mode'
 import { parseShopSlug } from '@/lib/shop-navigation'
 import { parseAppPath } from '@/lib/view-routes'
 import { registerAppNavigator } from '@/lib/app-navigate'
@@ -192,13 +195,16 @@ interface AppShellProps {
 
 function AppShellInner({ collectionSlug }: AppShellProps) {
   const view = useStore((s) => s.view)
+  const user = useStore((s) => s.user)
   const applyShopRoute = useStore((s) => s.applyShopRoute)
   const applyRouteState = useStore((s) => s.applyRouteState)
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { status: authStatus } = useSession()
   const storeHydrated = useStoreHydration()
   const [routeReady, setRouteReady] = useState(false)
+  const { settings: maintenance, loaded: maintenanceLoaded } = useMaintenanceMode()
 
   useEffect(() => {
     registerAppNavigator((path, mode) => {
@@ -257,6 +263,33 @@ function AppShellInner({ collectionSlug }: AppShellProps) {
 
   const hideChrome = view === 'admin'
   const ready = storeHydrated && routeReady
+  const authReady = authStatus !== 'loading'
+  const isAdmin = user?.role === 'admin'
+  const allowDuringMaintenance = view === 'admin' || view === 'login'
+  const showMaintenance =
+    maintenanceLoaded &&
+    authReady &&
+    maintenance.enabled &&
+    !isAdmin &&
+    !allowDuringMaintenance
+
+  if (!maintenanceLoaded || !authReady) {
+    return (
+      <div className="min-h-screen flex flex-col bg-white overflow-x-clip">
+        <AuthGuard>
+          <PageLoader />
+        </AuthGuard>
+      </div>
+    )
+  }
+
+  if (showMaintenance) {
+    return (
+      <AuthGuard>
+        <MaintenanceScreen settings={maintenance} />
+      </AuthGuard>
+    )
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-white overflow-x-clip">

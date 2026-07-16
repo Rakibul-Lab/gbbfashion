@@ -84,3 +84,22 @@ export async function PUT(
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
   }
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const existing = await db.order.findUnique({ where: { id } })
+    if (!existing) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    await db.order.delete({ where: { id } })
+    return NextResponse.json({ success: true, message: 'Order deleted' })
+  } catch (error) {
+    console.error('Order DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 })
+  }
+}

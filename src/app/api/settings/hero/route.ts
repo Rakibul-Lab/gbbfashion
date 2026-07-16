@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
 import {
-  DEFAULT_HERO_MEDIA_TYPE,
-  DEFAULT_HERO_MEDIA_URL,
   ensureSiteDirs,
   getUploadsDir,
   saveSiteSettings,
@@ -97,13 +95,13 @@ export async function DELETE() {
     )
 
     const settings = await saveSiteSettings({
-      heroMediaType: DEFAULT_HERO_MEDIA_TYPE,
-      heroMediaUrl: DEFAULT_HERO_MEDIA_URL,
+      heroMediaType: 'image',
+      heroMediaUrl: '',
     })
 
-    return NextResponse.json({ ...settings, message: 'Hero media reset to default' })
+    return NextResponse.json({ ...settings, message: 'Hero media cleared' })
   } catch (error) {
     console.error('Hero reset error:', error)
-    return NextResponse.json({ error: 'Failed to reset hero media' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to clear hero media' }, { status: 500 })
   }
 }

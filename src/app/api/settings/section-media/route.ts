@@ -97,3 +97,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to upload section media' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const slotKey = String(searchParams.get('slot') || '').trim()
+
+    if (!VALID_KEYS.has(slotKey)) {
+      return NextResponse.json({ error: 'Invalid media slot' }, { status: 400 })
+    }
+
+    await ensureSiteDirs()
+    const uploadsDir = getUploadsDir()
+    const sectionsDir = path.join(uploadsDir, 'sections')
+    const existing = await fs.readdir(sectionsDir).catch(() => [] as string[])
+    await Promise.all(
+      existing
+        .filter((name) => name.startsWith(`${slotKey}.`) || name.startsWith(`${slotKey}-`))
+        .map((name) => fs.unlink(path.join(sectionsDir, name)).catch(() => undefined))
+    )
+
+    const current = await getSiteSettings()
+    const sectionMedia = mergeSectionMedia(current.sectionMedia)
+    sectionMedia[slotKey] = { type: 'image', url: '' }
+
+    const settings = await saveSiteSettings({ sectionMedia })
+
+    return NextResponse.json({
+      ...settings,
+      cleared: { slot: slotKey },
+      message: `${slotKey} media cleared`,
+    })
+  } catch (error) {
+    console.error('Section media clear error:', error)
+    return NextResponse.json({ error: 'Failed to clear section media' }, { status: 500 })
+  }
+}

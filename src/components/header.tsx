@@ -209,11 +209,13 @@ export function Header() {
                           className="relative shrink-0 overflow-hidden rounded-sm"
                           style={{ width: logoWidth, height: logoHeight }}
                         >
-                          <img
-                            src={logoUrl}
-                            alt=""
-                            className="absolute inset-0 h-full w-full object-fill object-center"
-                          />
+                          {logoUrl ? (
+                            <img
+                              src={logoUrl}
+                              alt=""
+                              className="absolute inset-0 h-full w-full object-fill object-center"
+                            />
+                          ) : null}
                         </span>
                         <span>
                           <span className="font-bold text-slate-900">GBB</span>{' '}
@@ -351,11 +353,13 @@ export function Header() {
                 className="relative shrink-0 overflow-hidden rounded-sm"
                 style={{ width: logoWidth, height: logoHeight }}
               >
-                <img
-                  src={logoUrl}
-                  alt="GBB Fashion"
-                  className="absolute inset-0 h-full w-full object-fill object-center"
-                />
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt="GBB Fashion"
+                    className="absolute inset-0 h-full w-full object-fill object-center"
+                  />
+                ) : null}
               </span>
               <span className="text-xl sm:text-2xl">
                 <span className="font-bold text-slate-900">GBB</span>{' '}

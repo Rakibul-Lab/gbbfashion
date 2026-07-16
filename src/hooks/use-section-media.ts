@@ -35,13 +35,29 @@ export function useSectionMedia() {
       })
 
     const onUpdated = (event: Event) => {
-      const detail = (event as CustomEvent<SectionMediaMap | { sectionMedia?: SectionMediaMap }>).detail
-      if (!detail) return
-      if ('sectionMedia' in detail && detail.sectionMedia) {
-        setMedia(mergeSectionMedia(detail.sectionMedia))
+      const detail = (event as CustomEvent).detail as
+        | SectionMediaMap
+        | { sectionMedia?: SectionMediaMap }
+        | null
+        | undefined
+      if (!detail || typeof detail !== 'object') return
+
+      const nested =
+        'sectionMedia' in detail &&
+        detail.sectionMedia &&
+        typeof detail.sectionMedia === 'object' &&
+        !('url' in detail.sectionMedia)
+          ? detail.sectionMedia
+          : null
+
+      if (nested) {
+        setMedia(mergeSectionMedia(nested))
         return
       }
-      setMedia(mergeSectionMedia(detail as SectionMediaMap))
+
+      if (!('url' in detail && 'type' in detail)) {
+        setMedia(mergeSectionMedia(detail as SectionMediaMap))
+      }
     }
 
     window.addEventListener(SECTION_MEDIA_UPDATED_EVENT, onUpdated as EventListener)

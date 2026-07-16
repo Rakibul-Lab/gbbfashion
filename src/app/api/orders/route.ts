@@ -202,8 +202,9 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Never block checkout on SMTP — shared hosts often hang on external mail.
-    // Order is already saved; email runs in the background.
+    // Order is saved first and returned to the customer immediately.
+    // Invoice email runs in the background via SMTP_HOST (sapphire.premium.hostns.io).
+    // If SMTP connects → invoice is emailed. If not → order still succeeds.
     let invoiceEmailQueued = false
     if (emailNormalized) {
       invoiceEmailQueued = true
@@ -229,13 +230,13 @@ export async function POST(request: NextRequest) {
       })
         .then((mailResult) => {
           if (!mailResult.ok) {
-            console.warn('[orders] invoice email skipped:', mailResult.reason)
+            console.warn('[orders] invoice email skipped (order still complete):', mailResult.reason)
           } else {
             console.info('[orders] invoice email sent:', order.id)
           }
         })
         .catch((mailError) => {
-          console.error('[orders] invoice email error:', mailError)
+          console.error('[orders] invoice email error (order still complete):', mailError)
         })
     }
 

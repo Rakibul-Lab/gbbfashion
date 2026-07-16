@@ -21,7 +21,7 @@ async function readPublicAsset(urlPath: string) {
 /** Browser requests /icon on refresh — serve the uploaded site logo, not the template mark. */
 export async function GET() {
   const settings = await getSiteSettings()
-  const candidates = [settings.logoUrl, '/uploads/logo.png', '/logo.svg']
+  const candidates = [settings.logoUrl, '/uploads/logo.png']
 
   for (const candidate of candidates) {
     if (!candidate) continue

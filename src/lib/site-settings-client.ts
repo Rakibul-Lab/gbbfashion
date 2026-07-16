@@ -1,12 +1,12 @@
 /** Client-safe defaults (no Node fs imports) */
-/** Prefer uploaded brand logo; `public/logo.svg` is the offline fallback (not Z Chat). */
-export const DEFAULT_LOGO_URL = '/uploads/logo.png'
+/** Empty until admin uploads — never force a stock logo/hero. */
+export const DEFAULT_LOGO_URL = ''
 export const DEFAULT_LOGO_WIDTH = 36
 export const DEFAULT_LOGO_HEIGHT = 36
 export const MIN_LOGO_DIM = 16
 export const MAX_LOGO_DIM = 200
 
-export const DEFAULT_HERO_MEDIA_URL = '/hero-banner.jpg'
+export const DEFAULT_HERO_MEDIA_URL = ''
 export const DEFAULT_HERO_MEDIA_TYPE = 'image' as const
 
 export type HeroMediaType = 'image' | 'video'
@@ -55,9 +55,9 @@ export const DEFAULT_PROMO_BANNERS: PromoBannerConfig[] = [
     id: 'prime',
     title: 'The Prime Drop',
     subtitle: 'UPTO 50% OFF',
-    image: '/banner-prime-drop.png',
+    image: '',
     mediaType: 'image',
-    mediaUrl: '/banner-prime-drop.png',
+    mediaUrl: '',
     ctaLabel: 'Shop Now',
     linkCategory: 'prime-drop',
     enabled: true,
@@ -66,9 +66,9 @@ export const DEFAULT_PROMO_BANNERS: PromoBannerConfig[] = [
     id: 'new',
     title: 'Luxe Leather Bags',
     subtitle: 'Exquisite craftsmanship meets contemporary design',
-    image: '/banner-luxe-leather.png',
+    image: '',
     mediaType: 'image',
-    mediaUrl: '/banner-luxe-leather.png',
+    mediaUrl: '',
     ctaLabel: 'Explore Collection',
     linkCategory: 'women',
     enabled: true,
@@ -82,10 +82,19 @@ export function normalizePromoBanners(
     Array.isArray(saved) && saved.length > 0 ? saved : DEFAULT_PROMO_BANNERS
   return source.map((b, i) => {
     const fallback = DEFAULT_PROMO_BANNERS[i] || DEFAULT_PROMO_BANNERS[0]
+    const rawMedia =
+      typeof b.mediaUrl === 'string'
+        ? b.mediaUrl.trim()
+        : typeof b.image === 'string'
+          ? b.image.trim()
+          : ''
+    // Keep uploads/remote only — never force stock banner art
     const mediaUrl =
-      (typeof b.mediaUrl === 'string' && b.mediaUrl.trim()) ||
-      (typeof b.image === 'string' && b.image.trim()) ||
-      fallback.mediaUrl
+      !rawMedia ||
+      rawMedia.startsWith('/uploads/') ||
+      /^https?:\/\//i.test(rawMedia)
+        ? rawMedia
+        : ''
     return {
       id: b.id || fallback.id,
       title: b.title || fallback.title,

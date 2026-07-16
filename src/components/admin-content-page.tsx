@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, Megaphone, LayoutGrid, Images, Upload } from 'lucide-react'
+import { Loader2, Save, Megaphone, LayoutGrid, Images, Upload, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -148,6 +148,41 @@ export function AdminContentPage() {
     if (!file) return
     const type = promoBanners[index]?.mediaType === 'video' ? 'video' : 'image'
     void uploadPromoMedia(index, file, type)
+  }
+
+  const clearPromoMedia = async (index: number) => {
+    const slotKey = index === 0 ? 'promo_prime' : 'promo_second'
+    setUploadingPromoIndex(index)
+    try {
+      const res = await fetch(
+        `/api/settings/section-media?slot=${encodeURIComponent(slotKey)}`,
+        { method: 'DELETE' }
+      )
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Clear failed')
+
+      const nextBanners = promoBanners.map((b, i) =>
+        i === index ? { ...b, mediaUrl: '', image: '' } : b
+      )
+      setPromoBanners(nextBanners)
+
+      if (data.sectionMedia) {
+        setSectionMedia(mergeSectionMedia(data.sectionMedia))
+        broadcastSectionMedia(mergeSectionMedia(data.sectionMedia))
+      }
+
+      await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ promoBanners: nextBanners }),
+      })
+
+      toast.success('Promo media cleared')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Clear failed')
+    } finally {
+      setUploadingPromoIndex(null)
+    }
   }
 
   if (loading) {
@@ -309,13 +344,26 @@ export function AdminContentPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Upload media</Label>
-                    <Label
-                      htmlFor={`promo-upload-${index}`}
-                      className="inline-flex items-center gap-2 h-10 px-3 rounded-lg bg-slate-900 text-white text-sm font-medium cursor-pointer hover:bg-slate-800 w-fit"
-                    >
-                      <Upload className="h-3.5 w-3.5" />
-                      Choose file
-                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      <Label
+                        htmlFor={`promo-upload-${index}`}
+                        className="inline-flex items-center gap-2 h-10 px-3 rounded-lg bg-slate-900 text-white text-sm font-medium cursor-pointer hover:bg-slate-800 w-fit"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Choose file
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-10"
+                        disabled={uploadingPromoIndex === index || !banner.mediaUrl}
+                        onClick={() => void clearPromoMedia(index)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                        Clear
+                      </Button>
+                    </div>
                     <Input
                       id={`promo-upload-${index}`}
                       type="file"
