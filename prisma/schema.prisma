@@ -136,14 +136,15 @@ model Order {
 }
 
 model OrderItem {
-  id          String  @id @default(cuid())
+  id          String   @id @default(cuid())
   orderId     String
-  productId   String
+  /** Nullable after product is deleted — productName/price snapshot remains on the order */
+  productId   String?
   productName String
   quantity    Int
   price       Float
-  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product     Product @relation(fields: [productId], references: [id])
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 }
 
 model Reel {

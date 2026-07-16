@@ -583,11 +583,21 @@ export function AdminDashboard() {
   const handleDeleteProduct = async (id: string) => {
     try {
       const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error()
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === 'string' ? data.error : 'Failed to delete product'
+        )
+      }
       toast.success('Product deleted')
+      if (editingProduct?.id === id) {
+        setEditingProduct(null)
+        setProductForm(emptyProduct)
+        setColorVariants([])
+      }
       fetchProducts()
-    } catch {
-      toast.error('Failed to delete product')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete product')
     }
   }
 

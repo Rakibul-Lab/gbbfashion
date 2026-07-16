@@ -74,10 +74,19 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+    const existing = await db.product.findUnique({ where: { id } })
+    if (!existing) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+
     await db.product.delete({ where: { id } })
     return NextResponse.json({ message: 'Product deleted' })
   } catch (error) {
     console.error('Product DELETE error:', error)
-    return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 })
+    const message =
+      error instanceof Error && /foreign key constraint/i.test(error.message)
+        ? 'Cannot delete this product yet. Run prisma/product-delete-set-null.sql on the database, then try again.'
+        : 'Failed to delete product'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
