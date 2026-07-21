@@ -4,6 +4,12 @@ import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
+import {
+  colorHasSizes,
+  parseGalleryImages,
+  resolveProductColorVariants,
+} from '@/lib/product-colors'
+import { setPendingProductColor } from '@/lib/pending-product-color'
 
 type AddToCartPlusProps = {
   productId: string
@@ -32,6 +38,7 @@ export function AddToCartPlus({
 }: AddToCartPlusProps) {
   const addToCart = useStore((s) => s.addToCart)
   const setView = useStore((s) => s.setView)
+  const selectProduct = useStore((s) => s.selectProduct)
 
   const dim = size === 'sm' ? 'h-8 w-8' : 'h-9 w-9'
   const icon = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5'
@@ -50,6 +57,8 @@ export function AddToCartPlus({
         let finalName = name
         let finalColor = color
         let finalSwatch = colorSwatch
+        let galleryImages: string | null = null
+        let productPayload: Record<string, unknown> | null = null
 
         if (!looksLikeDbId(productId)) {
           try {
@@ -64,10 +73,51 @@ export function AddToCartPlus({
               finalPrice = match.price
               finalImage = match.image
               finalName = match.name
+              galleryImages = match.galleryImages ?? null
+              productPayload = match
             }
           } catch {
             // keep featured card data as fallback
           }
+        } else {
+          try {
+            const res = await fetch(`/api/products/${finalId}`)
+            const data = await res.json()
+            if (data?.id) {
+              galleryImages = data.galleryImages ?? null
+              productPayload = data
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        const variants =
+          productPayload != null
+            ? resolveProductColorVariants(productPayload as Parameters<typeof resolveProductColorVariants>[0])
+            : parseGalleryImages(galleryImages)
+
+        if (variants.length > 0 && !finalColor) {
+          setPendingProductColor(null)
+          selectProduct(finalId)
+          setView('product')
+          toast.error('Please select a color')
+          return
+        }
+
+        const active =
+          variants.find(
+            (v) =>
+              finalColor &&
+              v.name.toLowerCase() === String(finalColor).toLowerCase()
+          ) || null
+
+        if (active && colorHasSizes(active)) {
+          setPendingProductColor(finalColor)
+          selectProduct(finalId)
+          setView('product')
+          toast.error('Please select a size')
+          return
         }
 
         addToCart({

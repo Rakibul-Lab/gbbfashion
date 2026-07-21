@@ -17,6 +17,7 @@ import {
   resolveProductColorVariants,
   type ProductColorVariant,
 } from '@/lib/product-colors'
+import { setPendingProductColor } from '@/lib/pending-product-color'
 
 type TrendTab = 'trend' | 'arrivals'
 
@@ -49,8 +50,7 @@ function TrendProductCard({
   const [isHovered, setIsHovered] = useState(false)
   const variants = useMemo(() => resolveProductColorVariants(product), [product])
   const [selected, setSelected] = useState<ProductColorVariant | null>(null)
-  const active = selected || variants[0]
-  const displayImage = active?.image || product.image
+  const displayImage = selected?.image || product.image
   const { openProduct } = useShopNavigation()
   const { format } = useCurrency()
   const original = product.originalPrice || product.price
@@ -67,9 +67,10 @@ function TrendProductCard({
       className="group relative snap-start w-full cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={() =>
+      onClick={() => {
+        setPendingProductColor(selected?.name)
         void openProduct({ id: product.id, slug: product.slug, name: product.name })
-      }
+      }}
     >
       <div className={`${productImageContainerClass} mb-3 rounded-sm`}>
         <img
@@ -97,8 +98,8 @@ function TrendProductCard({
             name={product.name}
             price={product.price}
             image={displayImage}
-            color={active?.name}
-            colorSwatch={active?.swatch}
+            color={selected?.name}
+            colorSwatch={selected?.swatch}
           />
         </div>
       </div>
@@ -121,7 +122,7 @@ function TrendProductCard({
           <div onClick={(e) => e.stopPropagation()}>
             <ProductColorSwatches
               variants={variants}
-              selectedName={active?.name || ''}
+              selectedName={selected?.name || ''}
               onSelect={setSelected}
               size="sm"
               stopPropagation

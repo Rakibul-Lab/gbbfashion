@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { PAYMENT_METHODS, PAYMENT_STATUS } from '@/lib/payment'
+import { restoreStockForOrderItems } from '@/lib/order-stock'
 
 export async function GET(
   _request: NextRequest,
@@ -31,7 +32,10 @@ export async function PUT(
   try {
     const { id } = await params
     const body = await request.json()
-    const existing = await db.order.findUnique({ where: { id } })
+    const existing = await db.order.findUnique({
+      where: { id },
+      include: { items: true },
+    })
     if (!existing) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
@@ -42,8 +46,12 @@ export async function PUT(
       paidAt?: Date | null
     } = {}
 
-    if (typeof body.status === 'string' && body.status !== existing.status) {
-      data.status = body.status
+    const nextStatus =
+      typeof body.status === 'string' && body.status !== existing.status
+        ? body.status
+        : null
+    if (nextStatus) {
+      data.status = nextStatus
     }
 
     // Explicit admin action: Cash received (COD)
@@ -65,17 +73,28 @@ export async function PUT(
     }
 
     if (Object.keys(data).length === 0) {
-      const order = await db.order.findUnique({
-        where: { id },
-        include: { items: true },
-      })
-      return NextResponse.json(order)
+      return NextResponse.json(existing)
     }
 
-    const order = await db.order.update({
-      where: { id },
-      data,
-      include: { items: true },
+    const shouldRestore =
+      nextStatus === 'cancelled' && existing.status !== 'cancelled'
+
+    const order = await db.$transaction(async (tx) => {
+      if (shouldRestore) {
+        await restoreStockForOrderItems(
+          tx,
+          existing.items.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+          }))
+        )
+      }
+      return tx.order.update({
+        where: { id },
+        data,
+        include: { items: true },
+      })
     })
 
     return NextResponse.json(order)
@@ -91,12 +110,28 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const existing = await db.order.findUnique({ where: { id } })
+    const existing = await db.order.findUnique({
+      where: { id },
+      include: { items: true },
+    })
     if (!existing) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    await db.order.delete({ where: { id } })
+    await db.$transaction(async (tx) => {
+      // Already cancelled orders already had stock restored
+      if (existing.status !== 'cancelled') {
+        await restoreStockForOrderItems(
+          tx,
+          existing.items.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+          }))
+        )
+      }
+      await tx.order.delete({ where: { id } })
+    })
     return NextResponse.json({ success: true, message: 'Order deleted' })
   } catch (error) {
     console.error('Order DELETE error:', error)

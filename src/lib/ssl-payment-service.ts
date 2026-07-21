@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { PAYMENT_STATUS } from '@/lib/payment'
+import { restoreStockForOrderItems } from '@/lib/order-stock'
 import {
   amountsMatch,
   validateSslCommerzPayment,
@@ -125,17 +126,32 @@ export async function markSslPaymentFailed(
     where: {
       OR: [{ id: tranId }, { transactionId: tranId }],
     },
+    include: { items: true },
   })
   if (!order) return null
   if (order.paymentStatus === PAYMENT_STATUS.PAID) return order
 
-  return db.order.update({
-    where: { id: order.id },
-    data: {
-      paymentStatus:
-        reason === 'cancelled' ? PAYMENT_STATUS.CANCELLED : PAYMENT_STATUS.FAILED,
-      status: 'cancelled',
-      paymentMeta: meta ? JSON.stringify(meta) : order.paymentMeta,
-    },
+  const alreadyCancelled = order.status === 'cancelled'
+
+  return db.$transaction(async (tx) => {
+    if (!alreadyCancelled) {
+      await restoreStockForOrderItems(
+        tx,
+        order.items.map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+        }))
+      )
+    }
+    return tx.order.update({
+      where: { id: order.id },
+      data: {
+        paymentStatus:
+          reason === 'cancelled' ? PAYMENT_STATUS.CANCELLED : PAYMENT_STATUS.FAILED,
+        status: 'cancelled',
+        paymentMeta: meta ? JSON.stringify(meta) : order.paymentMeta,
+      },
+    })
   })
 }

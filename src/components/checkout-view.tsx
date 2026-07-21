@@ -167,15 +167,22 @@ export function CheckoutView() {
           ...form,
           paymentMethod,
           totalAmount: total,
-          items: cart.map((item) => ({
-            productId: item.productId,
-            productName:
-              item.color && item.color !== 'Default'
-                ? `${item.name} — ${item.color}`
-                : item.name,
-            quantity: item.quantity,
-            price: item.price,
-          })),
+          items: cart.map((item) => {
+            const suffix = [
+              item.color && item.color !== 'Default' ? item.color : null,
+              item.size || null,
+            ]
+              .filter(Boolean)
+              .join(' / ')
+            return {
+              productId: item.productId,
+              productName: suffix ? `${item.name} — ${suffix}` : item.name,
+              quantity: item.quantity,
+              price: item.price,
+              color: item.color || null,
+              size: item.size || null,
+            }
+          }),
         }),
       })
 
@@ -444,7 +451,7 @@ export function CheckoutView() {
                 <div className="space-y-3 max-h-52 overflow-y-auto">
                   {cart.map((item) => (
                     <div
-                      key={`${item.productId}-${item.color || 'default'}`}
+                      key={`${item.productId}-${item.color || 'default'}-${item.size || 'os'}`}
                       className="flex items-center gap-3"
                     >
                       <div className={`${productThumbClass} w-12 rounded-lg`}>
@@ -459,6 +466,7 @@ export function CheckoutView() {
                         <p className="text-xs text-slate-400">
                           Qty: {item.quantity}
                           {item.color && item.color !== 'Default' ? ` · ${item.color}` : ''}
+                          {item.size ? ` · ${item.size}` : ''}
                         </p>
                       </div>
                       <span className="text-sm font-medium text-slate-700">

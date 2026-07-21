@@ -14,6 +14,7 @@ import {
 
 export interface InvoiceOrderItem {
   id: string
+  productId?: string | null
   productName: string
   quantity: number
   price: number

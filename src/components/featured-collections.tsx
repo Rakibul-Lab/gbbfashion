@@ -16,6 +16,7 @@ import { useCurrency } from '@/hooks/use-currency'
 import { resolveProductColorVariants } from '@/lib/product-colors'
 import { normalizePrimeCollection } from '@/lib/prime-collection'
 import { trackSelectItem, trackViewItemList } from '@/lib/gtm'
+import { setPendingProductColor } from '@/lib/pending-product-color'
 
 type CollectionTab = 'bags' | 'shoes'
 
@@ -95,8 +96,8 @@ function ColorSwatches({
   onColorSelect,
 }: {
   colors: ColorVariant[]
-  selectedColor: number
-  onColorSelect: (index: number) => void
+  selectedColor: number | null
+  onColorSelect: (index: number | null) => void
 }) {
   if (colors.length <= 1) return null
 
@@ -109,7 +110,8 @@ function ColorSwatches({
           type="button"
           onClick={(e) => {
             e.stopPropagation()
-            onColorSelect(index)
+            // Same color again → deselect → featured image
+            onColorSelect(selectedColor === index ? null : index)
           }}
           className={`relative rounded-full transition-all duration-200 ${
             selectedColor === index
@@ -117,7 +119,11 @@ function ColorSwatches({
               : 'ring-1 ring-slate-200 hover:ring-slate-400'
           }`}
           style={{ width: '20px', height: '20px' }}
-          title={color.name}
+          title={
+            selectedColor === index
+              ? `${color.name} (click again to clear)`
+              : color.name
+          }
           aria-label={color.name}
         >
           <span
@@ -141,15 +147,17 @@ function ProductCard({
   listId: string
   listName: string
 }) {
-  const [selectedColor, setSelectedColor] = useState(0)
+  // null = no color picked → show main featured product.image
+  const [selectedColor, setSelectedColor] = useState<number | null>(null)
   const [isHovered, setIsHovered] = useState(false)
   const { goToProduct } = useShopNavigation()
   const { format } = useCurrency()
 
-  const activeColor = product.colors[selectedColor] ?? product.colors[0]
+  const activeColor = selectedColor != null ? product.colors[selectedColor] : null
   const displayImage = activeColor?.thumbnail || product.image
   const hoverImage = product.secondaryImage || product.image
-  const showHoverSwap = isHovered && selectedColor === 0 && hoverImage !== displayImage
+  const showHoverSwap =
+    isHovered && selectedColor == null && hoverImage !== displayImage
 
   const open = () => {
     trackSelectItem({
@@ -159,10 +167,12 @@ function ProductCard({
         item_id: product.id,
         item_name: product.name,
         item_category: product.collection,
-        item_variant: activeColor?.name !== 'Default' ? activeColor?.name : undefined,
+        item_variant:
+          activeColor && activeColor.name !== 'Default' ? activeColor.name : undefined,
         price: product.price,
       },
     })
+    setPendingProductColor(activeColor?.name !== 'Default' ? activeColor?.name : null)
     goToProduct({ id: product.id, slug: product.slug })
   }
 
@@ -190,7 +200,7 @@ function ProductCard({
             }`}
             loading="lazy"
           />
-          {selectedColor === 0 && (
+          {selectedColor == null && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={hoverImage}
@@ -227,7 +237,7 @@ function ProductCard({
               name={product.name}
               price={product.price}
               image={displayImage}
-              color={activeColor?.name !== 'Default' ? activeColor?.name : null}
+              color={activeColor && activeColor.name !== 'Default' ? activeColor.name : null}
               colorSwatch={activeColor?.swatch}
             />
           </div>

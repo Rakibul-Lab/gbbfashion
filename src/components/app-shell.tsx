@@ -141,29 +141,52 @@ function ProgressiveHome() {
 
 function ViewRenderer({ view }: { view: string }) {
   const { user, setView } = useStore()
+  const { status: authStatus } = useSession()
+  const pathname = usePathname()
+  const onAdmin = pathname === '/admin' || Boolean(pathname?.startsWith('/admin/'))
 
   useEffect(() => {
-    if (view !== 'admin') return
-    if (!user) {
-      setView('login', { replace: true })
-      return
-    }
+    if (view !== 'admin' && !onAdmin) return
+    if (authStatus === 'loading') return
+    if (authStatus === 'unauthenticated') return
+    if (!user) return
+    // Confirmed signed-in non-admin — leave admin
     if (user.role !== 'admin') {
       setView('home', { replace: true })
     }
-  }, [view, user, setView])
+  }, [view, user, setView, authStatus, onAdmin])
 
-  const authRequired = view === 'account' || view === 'admin'
+  // URL is /admin — force admin view only while authenticated (or still loading session)
+  const effectiveView =
+    onAdmin && authStatus !== 'unauthenticated'
+      ? view === 'login'
+        ? 'login'
+        : 'admin'
+      : view
 
-  if (authRequired && !user) {
+  const authRequired = effectiveView === 'account' || effectiveView === 'admin'
+  const authPending =
+    (effectiveView === 'admin' || onAdmin) &&
+    (authStatus === 'loading' || (authStatus === 'authenticated' && !user))
+
+  if (authPending) {
     return <PageLoader />
   }
 
-  if (view === 'admin' && user?.role !== 'admin') {
+  // Logged out on /admin — AuthGuard navigates to /login; show site login meanwhile
+  if (onAdmin && authStatus === 'unauthenticated') {
+    return <LoginForm />
+  }
+
+  if (authRequired && authStatus === 'unauthenticated') {
+    return <LoginForm />
+  }
+
+  if (effectiveView === 'admin' && user && user.role !== 'admin') {
     return <PageLoader />
   }
 
-  switch (view) {
+  switch (effectiveView) {
     case 'home':
       return <ProgressiveHome />
     case 'shop':
@@ -177,7 +200,7 @@ function ViewRenderer({ view }: { view: string }) {
     case 'confirmation':
       return <OrderConfirmation />
     case 'admin':
-      return <AdminDashboard />
+      return user?.role === 'admin' ? <AdminDashboard /> : <PageLoader />
     case 'login':
       return <LoginForm />
     case 'signup':
@@ -224,9 +247,14 @@ function AppShellInner({ collectionSlug }: AppShellProps) {
         accountTab: parsed.accountTab,
         orderId: parsed.orderId,
       })
+    } else if (pathname === '/admin' || pathname?.startsWith('/admin/')) {
+      // Fallback if parser ever misses — never leave /admin as "home"
+      applyRouteState({ view: 'admin' })
     }
     setRouteReady(true)
-  }, [storeHydrated, pathname, searchParams, applyRouteState])
+    // Depend on the query string value, not the searchParams object identity
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeHydrated, pathname, searchParams?.toString(), applyRouteState])
 
   useEffect(() => {
     if (!storeHydrated || collectionSlug === undefined) return
@@ -261,11 +289,17 @@ function AppShellInner({ collectionSlug }: AppShellProps) {
     return () => window.removeEventListener('popstate', onPopState)
   }, [applyRouteState, applyShopRoute])
 
-  const hideChrome = view === 'admin'
+  const hideChrome =
+    view === 'admin' ||
+    pathname === '/admin' ||
+    Boolean(pathname?.startsWith('/admin/'))
   const ready = storeHydrated && routeReady
   const authReady = authStatus !== 'loading'
   const isAdmin = user?.role === 'admin'
-  const allowDuringMaintenance = view === 'admin' || view === 'login'
+  const onAdminPath =
+    pathname === '/admin' || Boolean(pathname?.startsWith('/admin/'))
+  const allowDuringMaintenance =
+    view === 'admin' || view === 'login' || onAdminPath
   const showMaintenance =
     maintenanceLoaded &&
     authReady &&

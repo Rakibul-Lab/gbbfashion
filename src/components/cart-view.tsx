@@ -65,7 +65,7 @@ export function CartView() {
           <div className="lg:col-span-2 space-y-4">
             {cart.map((item, index) => (
               <motion.div
-                key={`${item.productId}-${item.color || 'default'}`}
+                key={`${item.productId}-${item.color || 'default'}-${item.size || 'os'}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
@@ -82,17 +82,27 @@ export function CartView() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-slate-900 line-clamp-1">{item.name}</h3>
-                        {item.color && item.color !== 'Default' && (
-                          <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
-                            {item.colorSwatch && (
-                              <span
-                                className="inline-block h-3 w-3 rounded-full border border-slate-200"
-                                style={{ backgroundColor: item.colorSwatch }}
-                              />
+                        {(item.color && item.color !== 'Default') || item.size ? (
+                          <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            {item.color && item.color !== 'Default' && (
+                              <span className="inline-flex items-center gap-1.5">
+                                {item.colorSwatch && (
+                                  <span
+                                    className="inline-block h-3 w-3 rounded-full border border-slate-200"
+                                    style={{ backgroundColor: item.colorSwatch }}
+                                  />
+                                )}
+                                Color: {item.color}
+                              </span>
                             )}
-                            Color: {item.color}
+                            {item.size ? (
+                              <span>
+                                {item.color && item.color !== 'Default' ? '· ' : ''}
+                                Size: {item.size}
+                              </span>
+                            ) : null}
                           </p>
-                        )}
+                        ) : null}
                         <p className="text-lg font-bold text-amber-700 mt-1">
                           {format(item.price)}
                         </p>
@@ -102,7 +112,12 @@ export function CartView() {
                             size="sm"
                             className="rounded-lg"
                             onChange={(next) =>
-                              updateQuantity(item.productId, next, item.color)
+                              updateQuantity(
+                                item.productId,
+                                next,
+                                item.color,
+                                item.size
+                              )
                             }
                           />
                           <div className="flex items-center gap-3">
@@ -113,7 +128,9 @@ export function CartView() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50"
-                              onClick={() => removeFromCart(item.productId, item.color)}
+                              onClick={() =>
+                                removeFromCart(item.productId, item.color, item.size)
+                              }
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

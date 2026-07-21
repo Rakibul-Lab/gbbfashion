@@ -6,12 +6,15 @@ import type { ProductColorVariant } from '@/lib/product-colors'
 type ProductColorSwatchesProps = {
   variants: ProductColorVariant[]
   selectedName: string
-  onSelect: (variant: ProductColorVariant) => void
+  /** Pass null to clear selection and restore the featured product image */
+  onSelect: (variant: ProductColorVariant | null) => void
   size?: 'sm' | 'md' | 'lg'
   showLabel?: boolean
   className?: string
   /** Stop card navigation when clicking swatches in listings */
   stopPropagation?: boolean
+  /** Allow clearing selection (click selected / double-click). Default true. */
+  allowDeselect?: boolean
 }
 
 export function ProductColorSwatches({
@@ -22,6 +25,7 @@ export function ProductColorSwatches({
   showLabel = false,
   className,
   stopPropagation = false,
+  allowDeselect = true,
 }: ProductColorSwatchesProps) {
   if (variants.length === 0) return null
 
@@ -31,13 +35,20 @@ export function ProductColorSwatches({
     (v) => v.name.toLowerCase() === selectedName.toLowerCase()
   )
 
+  const guard = (e: React.MouseEvent) => {
+    if (stopPropagation) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }
+
   return (
     <div className={cn('space-y-2', className)}>
       {showLabel && (
         <p className="text-sm text-slate-600">
           Color:{' '}
           <span className="font-medium text-slate-900">
-            {selected?.name || selectedName}
+            {selected?.name || selectedName || 'Default'}
           </span>
         </p>
       )}
@@ -57,12 +68,17 @@ export function ProductColorSwatches({
               type="button"
               role="radio"
               aria-checked={isActive}
-              title={variant.name}
+              title={
+                isActive && allowDeselect
+                  ? `${variant.name} (click again to clear)`
+                  : variant.name
+              }
               aria-label={variant.name}
               onClick={(e) => {
-                if (stopPropagation) {
-                  e.preventDefault()
-                  e.stopPropagation()
+                guard(e)
+                if (allowDeselect && isActive) {
+                  onSelect(null)
+                  return
                 }
                 onSelect(variant)
               }}

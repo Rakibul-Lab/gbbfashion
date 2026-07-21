@@ -282,6 +282,80 @@ export function getSectionMedia(
   return merged[key] || { type: 'image', url: '' }
 }
 
+/** Homepage lifestyle / banner slots that show on the storefront front page */
+export const HOMEPAGE_FRONT_MEDIA_KEYS = [
+  'promo_prime',
+  'promo_second',
+  'backpack_series_0',
+  'backpack_series_1',
+  'backpack_series_2',
+  'bag_the_vibe',
+  'bag_the_vibe_product',
+  'luxe_leather',
+  'own_it_lead_it',
+] as const
+
+/** All section slots that can receive featured product image fallbacks */
+export const FRONT_IMAGE_FALLBACK_KEYS: readonly string[] = SECTION_MEDIA_SLOTS.map((s) => s.key)
+
+/**
+ * Fill empty front image slots with product images (featured first).
+ * Existing uploaded URLs are never overwritten.
+ */
+export function fillEmptySectionMediaWithImages(
+  map: SectionMediaMap,
+  imageUrls: string[],
+  keys: readonly string[] = FRONT_IMAGE_FALLBACK_KEYS
+): SectionMediaMap {
+  const urls = imageUrls.map((u) => (typeof u === 'string' ? u.trim() : '')).filter(Boolean)
+  if (!urls.length) return map
+
+  const next: SectionMediaMap = { ...map }
+  let cursor = 0
+  for (const key of keys) {
+    const current = next[key]
+    if (current?.url) continue
+    next[key] = {
+      type: 'image',
+      url: urls[cursor % urls.length],
+    }
+    cursor += 1
+  }
+  return next
+}
+
+/** Prefer featured product images, then prime / new arrivals, then any with an image */
+export function collectFrontProductImages(
+  products: Array<{
+    image?: string | null
+    isFeatured?: boolean | null
+    isPrimeDrop?: boolean | null
+    isNewArrival?: boolean | null
+  }>
+): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+
+  const push = (url?: string | null) => {
+    const clean = typeof url === 'string' ? url.trim() : ''
+    if (!clean || seen.has(clean)) return
+    seen.add(clean)
+    out.push(clean)
+  }
+
+  for (const p of products) {
+    if (p.isFeatured) push(p.image)
+  }
+  for (const p of products) {
+    if (p.isPrimeDrop || p.isNewArrival) push(p.image)
+  }
+  for (const p of products) {
+    push(p.image)
+  }
+
+  return out
+}
+
 export function sectionMediaGroups(): { group: string; slots: SectionMediaSlotDef[] }[] {
   const order: string[] = []
   const byGroup = new Map<string, SectionMediaSlotDef[]>()

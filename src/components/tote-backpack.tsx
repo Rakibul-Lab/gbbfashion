@@ -18,6 +18,7 @@ import {
   resolveProductColorVariants,
   type ProductColorVariant,
 } from '@/lib/product-colors'
+import { setPendingProductColor } from '@/lib/pending-product-color'
 
 type ToteBackpackTab = 'tote' | 'backpack'
 
@@ -63,11 +64,10 @@ function ProductCard({ product, index }: { product: ApiProduct; index: number })
   const [isHovered, setIsHovered] = useState(false)
   const variants = useMemo(() => resolveProductColorVariants(product), [product])
   const [selected, setSelected] = useState<ProductColorVariant | null>(null)
-  const active = selected || variants[0]
-  const displayImage = active?.image || product.image
+  const displayImage = selected?.image || product.image
   const hoverImage = product.secondaryImage || product.image
   const showHoverSwap =
-    isHovered && (!selected || selected === variants[0]) && hoverImage !== displayImage
+    isHovered && !selected && hoverImage !== displayImage
   const { openProduct } = useShopNavigation()
   const { format } = useCurrency()
   const original = product.originalPrice || product.price
@@ -82,9 +82,10 @@ function ProductCard({ product, index }: { product: ApiProduct; index: number })
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.05, ease: [0.25, 0.46, 0.45, 0.94] }}
       className={`snap-start ${productCardWidthClass} cursor-pointer`}
-      onClick={() =>
+      onClick={() => {
+        setPendingProductColor(selected?.name)
         void openProduct({ id: product.id, slug: product.slug, name: product.name })
-      }
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -152,7 +153,7 @@ function ProductCard({ product, index }: { product: ApiProduct; index: number })
             <div onClick={(e) => e.stopPropagation()}>
               <ProductColorSwatches
                 variants={variants}
-                selectedName={active?.name || ''}
+                selectedName={selected?.name || ''}
                 onSelect={setSelected}
                 size="sm"
                 stopPropagation

@@ -16,6 +16,7 @@ export function buildViewPath(
     productId?: string | null
     accountTab?: AccountTab
     orderId?: string | null
+    adminPage?: string | null
   } = {}
 ): string {
   switch (view) {
@@ -35,8 +36,17 @@ export function buildViewPath(
         ? `${base}?order=${encodeURIComponent(opts.orderId)}`
         : base
     }
-    case 'admin':
+    case 'admin': {
+      const page =
+        opts.adminPage ||
+        (typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('page')
+          : null)
+      if (page && page !== 'overview') {
+        return `/admin?page=${encodeURIComponent(page)}`
+      }
       return '/admin'
+    }
     case 'login':
       return '/login'
     case 'signup':
@@ -59,7 +69,14 @@ export function parseAppPath(
     search.startsWith('?') ? search.slice(1) : search
   )
 
-  if (path === '/') return { view: 'home' }
+  if (path === '/') {
+    const viewParam = params.get('view')
+    if (viewParam === 'login') return { view: 'login' }
+    if (viewParam === 'signup') return { view: 'signup' }
+    if (viewParam === 'admin') return { view: 'admin' }
+    if (viewParam === 'account') return { view: 'account' }
+    return { view: 'home' }
+  }
   if (path === '/cart') return { view: 'cart' }
   if (path === '/checkout') return { view: 'checkout' }
   if (path === '/admin') return { view: 'admin' }

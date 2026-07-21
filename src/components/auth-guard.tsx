@@ -1,8 +1,12 @@
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useStore, type ViewType } from '@/lib/store'
+
+const DEFAULT_PROTECTED: ViewType[] = ['admin', 'account']
+const DEFAULT_GUEST_ONLY: ViewType[] = ['login', 'signup']
 
 interface AuthGuardProps {
   children: ReactNode
@@ -10,57 +14,80 @@ interface AuthGuardProps {
   guestOnlyViews?: ViewType[]
 }
 
+function isAdminPath(pathname: string | null) {
+  return pathname === '/admin' || Boolean(pathname?.startsWith('/admin/'))
+}
+
 /** Keeps Zustand user in sync with NextAuth session (survives refresh). */
 function useHydrateUserFromSession() {
   const { data: session, status } = useSession()
   const setUser = useStore((s) => s.setUser)
-  const user = useStore((s) => s.user)
 
   useEffect(() => {
     if (status === 'loading') return
 
     if (status === 'authenticated' && session?.user) {
-      const next = {
+      setUser({
         id: session.user.id,
         name: session.user.name || '',
         email: session.user.email || '',
         role: session.user.role || 'customer',
-      }
-      if (
-        !user ||
-        user.id !== next.id ||
-        user.name !== next.name ||
-        user.email !== next.email ||
-        user.role !== next.role
-      ) {
-        setUser(next)
-      }
+      })
       return
     }
 
-    if (status === 'unauthenticated' && user) {
+    if (status === 'unauthenticated') {
       setUser(null)
     }
-  }, [session, status, setUser, user])
+  }, [session, status, setUser])
 }
 
 export function AuthGuard({
   children,
-  protectedViews = ['admin', 'account'],
-  guestOnlyViews = ['login', 'signup'],
+  protectedViews = DEFAULT_PROTECTED,
+  guestOnlyViews = DEFAULT_GUEST_ONLY,
 }: AuthGuardProps) {
   const { status } = useSession()
-  const { view, user, setView, setPostLoginView, consumePostLoginView } = useStore()
+  const pathname = usePathname()
+  const view = useStore((s) => s.view)
+  const user = useStore((s) => s.user)
+  const setView = useStore((s) => s.setView)
+  const setPostLoginView = useStore((s) => s.setPostLoginView)
+  const consumePostLoginView = useStore((s) => s.consumePostLoginView)
   useHydrateUserFromSession()
+  const sawLoading = useRef(false)
 
   useEffect(() => {
-    // Wait for NextAuth before enforcing redirects (avoids bounce to home/login on refresh)
-    if (status === 'loading') return
-
-    if (status === 'unauthenticated' && protectedViews.includes(view)) {
-      setPostLoginView(view)
-      setView('login', { replace: true })
+    if (status === 'loading') {
+      sawLoading.current = true
       return
+    }
+
+    const onAdmin = isAdminPath(pathname)
+
+    // Locked: authenticated admin on /admin — never leave this URL/view
+    if (status === 'authenticated' && user?.role === 'admin' && onAdmin) {
+      if (view !== 'admin') {
+        setView('admin', { replace: true, syncUrl: false })
+      }
+      return
+    }
+
+    // Authenticated admin should land on admin after login screens
+    if (status === 'authenticated' && user?.role === 'admin' && guestOnlyViews.includes(view)) {
+      consumePostLoginView()
+      setView('admin', { replace: true })
+      return
+    }
+
+    // Only redirect away from protected views after a real unauthenticated state
+    if (status === 'unauthenticated' && sawLoading.current) {
+      if (protectedViews.includes(view) || onAdmin) {
+        setPostLoginView(onAdmin ? 'admin' : view)
+        // Always leave /admin for the storefront login page
+        setView('login', { replace: true })
+        return
+      }
     }
 
     if (status === 'authenticated' && user && guestOnlyViews.includes(view)) {
@@ -77,6 +104,7 @@ export function AuthGuard({
     status,
     view,
     user,
+    pathname,
     setView,
     setPostLoginView,
     consumePostLoginView,

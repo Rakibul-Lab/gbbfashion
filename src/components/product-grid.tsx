@@ -35,6 +35,7 @@ import {
 } from '@/lib/product-colors'
 import { useCurrency } from '@/hooks/use-currency'
 import { normalizePrimeCollection } from '@/lib/prime-collection'
+import { setPendingProductColor } from '@/lib/pending-product-color'
 
 interface Product {
   id: string
@@ -79,8 +80,7 @@ function ShopProductCard({
   const { format } = useCurrency()
   const variants = useMemo(() => resolveProductColorVariants(product), [product])
   const [selected, setSelected] = useState<ProductColorVariant | null>(null)
-  const active = selected || variants[0]
-  const displayImage = active?.image || product.image
+  const displayImage = selected?.image || product.image
 
   return (
     <motion.div
@@ -91,7 +91,13 @@ function ShopProductCard({
       className="min-w-0"
     >
       <Card className="group overflow-hidden rounded-xl border-slate-200 p-0 gap-0 hover:shadow-xl hover:shadow-amber-500/5 transition-all duration-300 cursor-pointer h-full flex flex-col">
-        <div className={`${productImageContainerClass} rounded-none`} onClick={onOpen}>
+        <div
+          className={`${productImageContainerClass} rounded-none`}
+          onClick={() => {
+            setPendingProductColor(selected?.name)
+            onOpen()
+          }}
+        >
           <OptimizedImage
             src={displayImage}
             alt={product.name}
@@ -118,22 +124,25 @@ function ShopProductCard({
               name={product.name}
               price={product.price}
               image={displayImage}
-              color={active?.name}
-              colorSwatch={active?.swatch}
+              color={selected?.name}
+              colorSwatch={selected?.swatch}
             />
           </div>
         </div>
         <CardContent className="p-3 sm:p-4 flex flex-col flex-1 gap-2">
           <h3
             className="font-medium text-sm sm:text-base text-slate-900 line-clamp-2 cursor-pointer hover:text-amber-800 transition-colors leading-snug"
-            onClick={onOpen}
+            onClick={() => {
+              setPendingProductColor(selected?.name)
+              onOpen()
+            }}
           >
             {product.name}
           </h3>
           {variants.length > 0 && (
             <ProductColorSwatches
               variants={variants}
-              selectedName={active?.name || ''}
+              selectedName={selected?.name || ''}
               onSelect={setSelected}
               size="sm"
               stopPropagation

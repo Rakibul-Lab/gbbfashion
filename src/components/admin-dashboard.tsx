@@ -1,14 +1,23 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useStore } from '@/lib/store'
 import { productThumbClass } from '@/lib/product-image'
 import {
   parseGalleryImages,
   serializeGalleryImages,
   colorNamesFromGallery,
+  galleryHasExplicitQuantities,
+  sumColorQuantity,
+  swatchForColorName,
+  SUGGESTED_SIZE_LABELS,
   type ProductColorVariant,
+  type ProductSizeStock,
+  type VariantPricingMode,
 } from '@/lib/product-colors'
+import { defaultPricingPatch, resolveColorPricing } from '@/lib/product-pricing'
+import { VariantPricingFields } from '@/components/admin/variant-pricing-fields'
 import {
   parseReelColors,
   serializeReelColors,
@@ -89,12 +98,24 @@ import {
   Share2,
   Mail,
   Construction,
+  CheckCircle2,
+  FileSpreadsheet,
+  Download,
 } from 'lucide-react'
 import { OrderInvoiceDialog, type InvoiceOrder } from '@/components/order-invoice'
+import { OrderConfirmDialog } from '@/components/order-confirm-dialog'
+import { OrderCashReceivedDialog } from '@/components/order-cash-received-dialog'
 import { MediaLibraryModal, type MediaItem } from '@/components/media-library-modal'
 import { MediaPickerButton } from '@/components/media-picker-button'
 import { AdminCategoriesPage } from '@/components/admin-categories-page'
 import { AdminContentPage } from '@/components/admin-content-page'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { exportToExcel, exportToPdf } from '@/lib/admin-export'
 import { AdminUsersPage } from '@/components/admin-users-page'
 import { AdminProfilePage } from '@/components/admin-profile-page'
 import { useCurrency, broadcastCurrency } from '@/hooks/use-currency'
@@ -137,6 +158,10 @@ import {
   paymentMethodLabel,
   paymentStatusLabel,
 } from '@/lib/payment'
+import {
+  resolveOrderItemColor,
+  resolveOrderItemSize,
+} from '@/lib/product-stock'
 // Using simple CSS-based chart instead of recharts for performance
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -169,6 +194,7 @@ interface Product {
 
 interface OrderItem {
   id: string
+  productId?: string | null
   productName: string
   quantity: number
   price: number
@@ -232,6 +258,27 @@ type AdminPage =
   | 'profile'
   | 'settings'
 
+const ADMIN_PAGES = new Set<AdminPage>([
+  'overview',
+  'products',
+  'categories',
+  'content',
+  'reels',
+  'orders',
+  'users',
+  'profile',
+  'settings',
+])
+
+function parseAdminPage(raw: string | null | undefined): AdminPage {
+  const value = String(raw || '').trim().toLowerCase()
+  return ADMIN_PAGES.has(value as AdminPage) ? (value as AdminPage) : 'overview'
+}
+
+function adminPathForPage(page: AdminPage) {
+  return page === 'overview' ? '/admin' : `/admin?page=${encodeURIComponent(page)}`
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const statusColors: Record<string, string> = {
@@ -242,6 +289,119 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-700',
 }
 
+function orderItemBaseName(productName: string): string {
+  const sep = ' — '
+  const idx = productName.lastIndexOf(sep)
+  return idx === -1 ? productName : productName.slice(0, idx).trim()
+}
+
+function summarizeOrderVariants(items: OrderItem[]): {
+  colors: string[]
+  sizes: string[]
+} {
+  const colors = new Set<string>()
+  const sizes = new Set<string>()
+  for (const item of items) {
+    const color = resolveOrderItemColor(null, item.productName)
+    const size = resolveOrderItemSize(null, item.productName)
+    if (color) colors.add(color)
+    if (size) sizes.add(size)
+  }
+  return { colors: [...colors], sizes: [...sizes] }
+}
+
+type OrderDatePreset = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom'
+type OrderSort = 'newest' | 'oldest'
+
+function startOfDay(d: Date) {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  return x
+}
+
+function endOfDay(d: Date) {
+  const x = new Date(d)
+  x.setHours(23, 59, 59, 999)
+  return x
+}
+
+function getOrderDateBounds(
+  preset: OrderDatePreset,
+  customFrom?: string,
+  customTo?: string,
+): { start: Date | null; end: Date | null } {
+  const now = new Date()
+  const todayStart = startOfDay(now)
+  const todayEnd = endOfDay(now)
+
+  switch (preset) {
+    case 'today':
+      return { start: todayStart, end: todayEnd }
+    case 'yesterday': {
+      const y = new Date(todayStart)
+      y.setDate(y.getDate() - 1)
+      return { start: startOfDay(y), end: endOfDay(y) }
+    }
+    case 'week': {
+      const start = new Date(todayStart)
+      const day = start.getDay()
+      const mondayOffset = day === 0 ? 6 : day - 1
+      start.setDate(start.getDate() - mondayOffset)
+      return { start, end: todayEnd }
+    }
+    case 'month':
+      return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: todayEnd }
+    case 'year':
+      return { start: new Date(now.getFullYear(), 0, 1), end: todayEnd }
+    case 'custom': {
+      if (!customFrom && !customTo) return { start: null, end: null }
+      return {
+        start: customFrom ? startOfDay(new Date(customFrom)) : null,
+        end: customTo ? endOfDay(new Date(customTo)) : null,
+      }
+    }
+    default:
+      return { start: null, end: null }
+  }
+}
+
+function orderMatchesDateRange(
+  createdAt: string | Date,
+  preset: OrderDatePreset,
+  customFrom?: string,
+  customTo?: string,
+): boolean {
+  if (preset === 'all') return true
+  const { start, end } = getOrderDateBounds(preset, customFrom, customTo)
+  if (!start && !end) return true
+  const created = new Date(createdAt)
+  if (Number.isNaN(created.getTime())) return false
+  if (start && created < start) return false
+  if (end && created > end) return false
+  return true
+}
+
+function orderMatchesSearch(order: Order, q: string): boolean {
+  if (!q) return true
+  const variantSummary = summarizeOrderVariants(order.items)
+  return (
+    order.id.toLowerCase().includes(q) ||
+    order.customerName.toLowerCase().includes(q) ||
+    order.customerEmail.toLowerCase().includes(q) ||
+    order.customerPhone.toLowerCase().includes(q) ||
+    order.status.toLowerCase().includes(q) ||
+    (order.paymentStatus ?? '').toLowerCase().includes(q) ||
+    String(order.totalAmount).includes(q) ||
+    variantSummary.colors.some((c) => c.toLowerCase().includes(q)) ||
+    variantSummary.sizes.some((s) => s.toLowerCase().includes(q)) ||
+    order.items.some(
+      (item) =>
+        item.productName.toLowerCase().includes(q) ||
+        orderItemBaseName(item.productName).toLowerCase().includes(q),
+    )
+  )
+}
+
 const paymentStatusColors: Record<string, string> = {
   unpaid: 'bg-slate-100 text-slate-700',
   pending: 'bg-amber-100 text-amber-700',
@@ -250,7 +410,8 @@ const paymentStatusColors: Record<string, string> = {
   cancelled: 'bg-orange-100 text-orange-700',
 }
 
-const categoryOptions = [
+/** Fallback if Categories CMS has not been seeded yet */
+const fallbackCategoryOptions = [
   { value: 'women', label: "Women's Bags" },
   { value: 'men', label: "Men's Bags" },
   { value: 'shoes', label: 'Shoes' },
@@ -258,6 +419,16 @@ const categoryOptions = [
   { value: 'kids', label: 'Kids' },
   { value: 'accessories', label: 'Accessories' },
 ]
+
+type CatalogCategory = {
+  slug: string
+  label: string
+  isActive: boolean
+  specialType: string | null
+  subcategories: { slug: string; label: string; isActive?: boolean }[]
+}
+
+const CATEGORIES_UPDATED_EVENT = 'gbb:categories-updated'
 
 const badgeOptions = [
   { value: '', label: 'None' },
@@ -285,8 +456,8 @@ const emptyProduct: Omit<Product, 'id' | 'createdAt'> = {
   galleryImages: null,
   features: '',
   rating: 0,
-  stock: 100,
-  inStock: true,
+  stock: 0,
+  inStock: false,
   badge: null,
   colors: null,
   collection: null,
@@ -315,6 +486,9 @@ const emptyReel: Omit<Reel, 'id' | 'createdAt'> = {
 const PRODUCTS_PER_PAGE = 10
 const REELS_PER_PAGE = 10
 
+const nativeSelectClassName =
+  'border-input bg-transparent flex h-9 w-full items-center rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50'
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function AdminDashboard() {
@@ -323,16 +497,45 @@ export function AdminDashboard() {
   const user = useStore((s) => s.user)
   const { logoUrl, logoWidth, logoHeight } = useSiteLogo()
   const { symbol: currencySymbol, format: formatMoney, code: currencyCode } = useCurrency()
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
-  // Navigation
-  const [activePage, setActivePage] = useState<AdminPage>('overview')
+  // Navigation — restored from /admin?page=… on refresh
+  const [activePage, setActivePageState] = useState<AdminPage>(() =>
+    parseAdminPage(
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('page')
+        : null
+    )
+  )
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const pageFromUrl = searchParams?.get('page') ?? ''
+
+  const goToPage = useCallback(
+    (page: AdminPage) => {
+      setActivePageState(page)
+      const next = adminPathForPage(page)
+      if (typeof window !== 'undefined') {
+        const current = `${window.location.pathname}${window.location.search}`
+        if (current === next) return
+      }
+      router.replace(next, { scroll: false })
+    },
+    [router]
+  )
+
+  useEffect(() => {
+    const fromUrl = parseAdminPage(pageFromUrl)
+    setActivePageState((prev) => (prev === fromUrl ? prev : fromUrl))
+  }, [pageFromUrl])
 
   // Data
   const [products, setProducts] = useState<Product[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [reels, setReels] = useState<Reel[]>([])
   const [users, setUsers] = useState<User[]>([])
+  const [catalogCategories, setCatalogCategories] = useState<CatalogCategory[]>([])
   const [loading, setLoading] = useState(true)
 
   // Product editor (inline — no modal)
@@ -358,10 +561,17 @@ export function AdminDashboard() {
 
   // Order state
   const [orderFilter, setOrderFilter] = useState('all')
+  const [orderSearch, setOrderSearch] = useState('')
+  const [orderDatePreset, setOrderDatePreset] = useState<OrderDatePreset>('all')
+  const [orderDateFrom, setOrderDateFrom] = useState('')
+  const [orderDateTo, setOrderDateTo] = useState('')
+  const [orderSort, setOrderSort] = useState<OrderSort>('newest')
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
   const [draftOrderStatuses, setDraftOrderStatuses] = useState<Record<string, string>>({})
   const [savingOrderId, setSavingOrderId] = useState<string | null>(null)
   const [invoiceOrder, setInvoiceOrder] = useState<InvoiceOrder | null>(null)
+  const [confirmOrder, setConfirmOrder] = useState<Order | null>(null)
+  const [cashReceivedOrder, setCashReceivedOrder] = useState<Order | null>(null)
 
   // Delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -409,14 +619,66 @@ export function AdminDashboard() {
     }
   }, [])
 
+  const fetchCatalogCategories = useCallback(async () => {
+    try {
+      const res = await fetch('/api/categories?all=1', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = (await res.json()) as CatalogCategory[]
+      if (Array.isArray(data)) setCatalogCategories(data)
+    } catch (error) {
+      console.error(error)
+    }
+  }, [])
+
   useEffect(() => {
     const load = async () => {
       setLoading(true)
-      await Promise.all([fetchProducts(), fetchOrders(), fetchReels(), fetchUsers()])
+      await Promise.all([
+        fetchProducts(),
+        fetchOrders(),
+        fetchReels(),
+        fetchUsers(),
+        fetchCatalogCategories(),
+      ])
       setLoading(false)
     }
     load()
-  }, [fetchProducts, fetchOrders, fetchReels, fetchUsers])
+  }, [fetchProducts, fetchOrders, fetchReels, fetchUsers, fetchCatalogCategories])
+
+  useEffect(() => {
+    const onUpdated = () => {
+      void fetchCatalogCategories()
+    }
+    window.addEventListener(CATEGORIES_UPDATED_EVENT, onUpdated)
+    return () => window.removeEventListener(CATEGORIES_UPDATED_EVENT, onUpdated)
+  }, [fetchCatalogCategories])
+
+  // Product categories only (exclude New Arrivals / Prime Drop nav specials)
+  const categoryOptions = (() => {
+    const fromCms = catalogCategories
+      .filter((c) => c.isActive !== false && !c.specialType)
+      .map((c) => ({ value: c.slug, label: c.label }))
+    if (fromCms.length === 0) return fallbackCategoryOptions
+    // Keep current product category visible even if inactive/missing from list
+    if (
+      productForm.category &&
+      !fromCms.some((c) => c.value === productForm.category)
+    ) {
+      return [
+        ...fromCms,
+        { value: productForm.category, label: `${productForm.category} (current)` },
+      ]
+    }
+    return fromCms
+  })()
+
+  const subcategoryOptions = (() => {
+    const cat = catalogCategories.find((c) => c.slug === productForm.category)
+    if (!cat) return [] as { value: string; label: string }[]
+    return (cat.subcategories || [])
+      .filter((s) => s.isActive !== false && s.slug)
+      .map((s) => ({ value: s.slug, label: s.label || s.slug }))
+  })()
 
   // ─── Stats ─────────────────────────────────────────────────────────────────
 
@@ -459,11 +721,15 @@ export function AdminDashboard() {
         productForm.secondaryImage ||
         colorVariants.find((v) => v.image && v.image !== productForm.image)?.image ||
         null
+      const stock =
+        colorVariants.length > 0
+          ? colorVariants.reduce((sum, v) => sum + sumColorQuantity(v), 0)
+          : normalizeStock(productForm.stock, 0)
       const payload = {
         ...productForm,
         rating: 0,
-        stock: normalizeStock(productForm.stock, 0),
-        inStock: inStockFromQuantity(normalizeStock(productForm.stock, 0)),
+        stock,
+        inStock: inStockFromQuantity(stock),
         galleryImages,
         colors,
         secondaryImage,
@@ -521,12 +787,127 @@ export function AdminDashboard() {
   const addColorVariant = () => {
     setColorVariants((prev) => [
       ...prev,
-      { name: `Color ${prev.length + 1}`, swatch: '#1a1a1a', image: '' },
+      {
+        name: `Color ${prev.length + 1}`,
+        swatch: '#1a1a1a',
+        image: '',
+        quantity: undefined,
+        pricingMode: 'base',
+      },
     ])
   }
 
   const removeColorVariant = (index: number) => {
     setColorVariants((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const updateColorVariantQuantity = (index: number, raw: string) => {
+    const trimmed = raw.trim()
+    if (trimmed === '') {
+      setColorVariants((prev) =>
+        prev.map((v, i) => (i === index ? { ...v, quantity: undefined } : v))
+      )
+      return
+    }
+    const quantity = normalizeStock(trimmed, 0)
+    setColorVariants((prev) =>
+      prev.map((v, i) => (i === index ? { ...v, quantity } : v))
+    )
+  }
+
+  const updateColorVariant = (index: number, patch: Partial<ProductColorVariant>) => {
+    setColorVariants((prev) =>
+      prev.map((v, i) => (i === index ? { ...v, ...patch } : v))
+    )
+  }
+
+  const setColorPricingMode = (index: number, mode: VariantPricingMode) => {
+    updateColorVariant(
+      index,
+      defaultPricingPatch(mode, productForm.price, productForm.originalPrice)
+    )
+  }
+
+  const setSizePricingMode = (
+    colorIndex: number,
+    sizeIndex: number,
+    mode: VariantPricingMode
+  ) => {
+    const variant = colorVariants[colorIndex]
+    const colorBase = resolveColorPricing(
+      variant,
+      productForm.price || 0,
+      productForm.originalPrice
+    )
+    updateColorSize(
+      colorIndex,
+      sizeIndex,
+      defaultPricingPatch(mode, colorBase.price, colorBase.originalPrice)
+    )
+  }
+
+  // Stock quantity = sum of per-color / per-size quantities when color gallery is used
+  useEffect(() => {
+    if (!productEditorOpen) return
+    if (colorVariants.length === 0) return
+    const stock = colorVariants.reduce((sum, v) => sum + sumColorQuantity(v), 0)
+    setProductForm((p) =>
+      p.stock === stock && p.inStock === inStockFromQuantity(stock)
+        ? p
+        : { ...p, stock, inStock: inStockFromQuantity(stock) }
+    )
+  }, [colorVariants, productEditorOpen])
+
+  const syncColorQuantityFromSizes = (
+    variant: ProductColorVariant
+  ): ProductColorVariant => {
+    const sizes = variant.sizes || []
+    if (sizes.length === 0) return variant
+    return {
+      ...variant,
+      quantity: sizes.reduce((sum, s) => sum + normalizeStock(s.quantity, 0), 0),
+    }
+  }
+
+  const addSizeToColor = (colorIndex: number, label = '') => {
+    setColorVariants((prev) =>
+      prev.map((v, i) => {
+        if (i !== colorIndex) return v
+        const sizes: ProductSizeStock[] = [
+          ...(v.sizes || []),
+          { label: label || '', quantity: undefined, pricingMode: 'base' },
+        ]
+        return syncColorQuantityFromSizes({ ...v, sizes })
+      })
+    )
+  }
+
+  const updateColorSize = (
+    colorIndex: number,
+    sizeIndex: number,
+    patch: Partial<ProductSizeStock>
+  ) => {
+    setColorVariants((prev) =>
+      prev.map((v, i) => {
+        if (i !== colorIndex) return v
+        const sizes = [...(v.sizes || [])]
+        sizes[sizeIndex] = { ...sizes[sizeIndex], ...patch }
+        return syncColorQuantityFromSizes({ ...v, sizes })
+      })
+    )
+  }
+
+  const removeColorSize = (colorIndex: number, sizeIndex: number) => {
+    setColorVariants((prev) =>
+      prev.map((v, i) => {
+        if (i !== colorIndex) return v
+        const sizes = (v.sizes || []).filter((_, si) => si !== sizeIndex)
+        if (sizes.length === 0) {
+          return { ...v, sizes: undefined }
+        }
+        return syncColorQuantityFromSizes({ ...v, sizes })
+      })
+    )
   }
 
   const handleDeleteProduct = async (id: string) => {
@@ -575,29 +956,44 @@ export function AdminDashboard() {
       isFeatured: product.isFeatured ?? false,
       sortOrder: product.sortOrder ?? 0,
     })
+    const productStock =
+      typeof product.stock === 'number' ? product.stock : product.inStock ? 100 : 0
     const fromGallery = parseGalleryImages(product.galleryImages)
+    const seedLegacyQty = (variants: ProductColorVariant[]) => {
+      if (!variants.length) return variants
+      if (galleryHasExplicitQuantities(product.galleryImages)) return variants
+      // Migrate old products: put existing total stock on the first color
+      return variants.map((v, i) => ({
+        ...v,
+        quantity: i === 0 ? productStock : 0,
+      }))
+    }
     if (fromGallery.some((v) => v.image)) {
-      setColorVariants(fromGallery)
+      setColorVariants(seedLegacyQty(fromGallery))
     } else {
       // Build variants from legacy colors + featured/secondary images
       const legacy = parseGalleryImages(product.colors)
       setColorVariants(
-        legacy.map((v, i) => ({
-          ...v,
-          image: i === 0 ? product.image : product.secondaryImage || product.image,
-        }))
+        seedLegacyQty(
+          legacy.map((v, i) => ({
+            ...v,
+            image: i === 0 ? product.image : product.secondaryImage || product.image,
+          }))
+        )
       )
     }
     setProductEditorOpen(true)
-    setActivePage('products')
+    goToPage('products')
+    void fetchCatalogCategories()
   }
 
   const openCreateProduct = () => {
     setEditingProduct(null)
-    setProductForm(emptyProduct)
+    setProductForm({ ...emptyProduct })
     setColorVariants([])
     setProductEditorOpen(true)
-    setActivePage('products')
+    goToPage('products')
+    void fetchCatalogCategories()
   }
 
   // ─── Reel handlers ────────────────────────────────────────────────────────
@@ -717,6 +1113,31 @@ export function AdminDashboard() {
 
   // ─── Order handlers ────────────────────────────────────────────────────────
 
+  const handleConfirmOrder = async (orderId: string) => {
+    setSavingOrderId(orderId)
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'processing' }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Order confirmed')
+      setConfirmOrder(null)
+      setDraftOrderStatuses((prev) => {
+        const next = { ...prev }
+        delete next[orderId]
+        return next
+      })
+      fetchOrders()
+      fetchProducts()
+    } catch {
+      toast.error('Failed to confirm order')
+    } finally {
+      setSavingOrderId(null)
+    }
+  }
+
   const handleUpdateOrderStatus = async (orderId: string, status: string) => {
     setSavingOrderId(orderId)
     try {
@@ -759,6 +1180,7 @@ export function AdminDashboard() {
         )
       }
       toast.success('Cash received — payment marked as paid')
+      setCashReceivedOrder(null)
       if (invoiceOrder?.id === orderId) {
         setInvoiceOrder({
           ...invoiceOrder,
@@ -792,12 +1214,18 @@ export function AdminDashboard() {
     }
   }
 
-  // ─── Logout ────────────────────────────────────────────────────────────────
+  // ─── Logout / leave admin ──────────────────────────────────────────────────
+
+  const goToWebsite = () => {
+    setView('home', { replace: true, syncUrl: false })
+    router.replace('/')
+  }
 
   const handleLogout = async () => {
     await signOut({ redirect: false })
     setUser(null)
-    setView('home')
+    setView('login', { replace: true, syncUrl: false })
+    router.replace('/login')
   }
 
   // ─── Delete dialog ─────────────────────────────────────────────────────────
@@ -869,8 +1297,194 @@ export function AdminDashboard() {
     setReelPage(1)
   }, [reelSearch, reelStatusFilter])
 
-  const filteredOrders =
-    orderFilter === 'all' ? orders : orders.filter((o) => o.status === orderFilter)
+  const filteredOrders = useMemo(() => {
+    const q = orderSearch.trim().toLowerCase()
+    let list =
+      orderFilter === 'all' ? orders : orders.filter((o) => o.status === orderFilter)
+
+    list = list.filter((o) =>
+      orderMatchesDateRange(o.createdAt, orderDatePreset, orderDateFrom, orderDateTo),
+    )
+
+    if (q) {
+      list = list.filter((o) => orderMatchesSearch(o, q))
+    }
+
+    return [...list].sort((a, b) => {
+      const ta = new Date(a.createdAt).getTime()
+      const tb = new Date(b.createdAt).getTime()
+      return orderSort === 'oldest' ? ta - tb : tb - ta
+    })
+  }, [
+    orders,
+    orderFilter,
+    orderSearch,
+    orderDatePreset,
+    orderDateFrom,
+    orderDateTo,
+    orderSort,
+  ])
+
+  const ordersHaveActiveFilters =
+    orderSearch.trim().length > 0 ||
+    orderFilter !== 'all' ||
+    orderDatePreset !== 'all'
+
+  const productExportColumns = [
+    { key: 'name', header: 'Name', width: 28 },
+    { key: 'category', header: 'Category', width: 14 },
+    { key: 'subCategory', header: 'Subcategory', width: 14 },
+    { key: 'badge', header: 'Badge', width: 12 },
+    { key: 'collection', header: 'Collection', width: 14 },
+    { key: 'price', header: 'Price', width: 10 },
+    { key: 'originalPrice', header: 'Compare at', width: 12 },
+    { key: 'stock', header: 'Stock', width: 8 },
+    { key: 'inStock', header: 'In stock', width: 10 },
+    { key: 'colors', header: 'Colors', width: 22 },
+    { key: 'hasFlash', header: 'Flash', width: 8 },
+    { key: 'isNewArrival', header: 'New arrival', width: 12 },
+    { key: 'isPrimeDrop', header: 'Prime drop', width: 12 },
+    { key: 'isFeatured', header: 'Featured', width: 10 },
+    { key: 'createdAt', header: 'Created', width: 18 },
+  ]
+
+  const orderExportBaseColumns = [
+    { key: 'id', header: 'Order ID', width: 28 },
+    { key: 'createdAt', header: 'Date', width: 18 },
+    { key: 'customerName', header: 'Customer', width: 18 },
+    { key: 'customerPhone', header: 'Phone', width: 14 },
+    { key: 'customerEmail', header: 'Email', width: 22 },
+    { key: 'status', header: 'Status', width: 12 },
+    { key: 'paymentMethod', header: 'Payment method', width: 14 },
+    { key: 'paymentStatus', header: 'Payment status', width: 14 },
+    { key: 'totalAmount', header: 'Total', width: 10 },
+  ]
+
+  const orderExportTailColumns = [
+    { key: 'shippingAddress', header: 'Shipping Address', width: 48 },
+  ]
+
+  const buildProductExportRows = () =>
+    filteredProducts.map((p) => {
+      const colors = parseGalleryImages(p.galleryImages)
+        .map((c) => c.name)
+        .filter(Boolean)
+      const legacyColors = (p.colors || '')
+        .split(',')
+        .map((n) => n.trim())
+        .filter(Boolean)
+      return {
+        name: p.name,
+        category: p.category,
+        subCategory: p.subCategory || '',
+        badge: p.badge || '',
+        collection: p.collection || '',
+        price: Math.round(p.price),
+        originalPrice: p.originalPrice != null ? Math.round(p.originalPrice) : '',
+        stock: p.stock,
+        inStock: p.inStock ? 'Yes' : 'No',
+        colors: (colors.length ? colors : legacyColors).join(', '),
+        hasFlash: p.hasFlash ? 'Yes' : 'No',
+        isNewArrival: p.isNewArrival ? 'Yes' : 'No',
+        isPrimeDrop: p.isPrimeDrop ? 'Yes' : 'No',
+        isFeatured: p.isFeatured ? 'Yes' : 'No',
+        createdAt: new Date(p.createdAt).toLocaleString(),
+      }
+    })
+
+  const formatOrderShippingAddress = (o: Order) =>
+    [
+      o.shippingAddress?.trim(),
+      [o.city, o.state].filter((part) => part && String(part).trim()).join(', '),
+      o.zipCode?.trim(),
+    ]
+      .filter(Boolean)
+      .join(', ')
+
+  const buildOrderExport = () => {
+    const maxItems = Math.max(
+      1,
+      ...filteredOrders.map((o) => (Array.isArray(o.items) ? o.items.length : 0))
+    )
+
+    const itemColumns = Array.from({ length: maxItems }, (_, index) => ({
+      key: `item${index + 1}`,
+      header: `Item ${index + 1}`,
+      width: 32,
+    }))
+
+    const columns = [
+      ...orderExportBaseColumns,
+      ...itemColumns,
+      ...orderExportTailColumns,
+    ]
+
+    const rows = filteredOrders.map((o) => {
+      const row: Record<string, string | number | null | undefined> = {
+        id: o.id,
+        createdAt: new Date(o.createdAt).toLocaleString(),
+        customerName: o.customerName,
+        customerPhone: o.customerPhone,
+        customerEmail: o.customerEmail || '',
+        status: o.status,
+        paymentMethod: o.paymentMethod || '',
+        paymentStatus: o.paymentStatus || '',
+        totalAmount: Math.round(o.totalAmount),
+        shippingAddress: formatOrderShippingAddress(o),
+      }
+
+      for (let i = 0; i < maxItems; i++) {
+        const item = o.items[i]
+        row[`item${i + 1}`] = item
+          ? `${item.productName} ×${item.quantity} @ ${Math.round(item.price)}`
+          : ''
+      }
+
+      return row
+    })
+
+    return { columns, rows }
+  }
+
+  const handleExportProducts = async (format: 'excel' | 'pdf') => {
+    try {
+      const rows = buildProductExportRows()
+      if (format === 'excel') {
+        await exportToExcel('products', 'Products', productExportColumns, rows, {
+          brandTitle: 'GBB Fashion Product Catalog',
+          brandSubtitle: 'www.gbbfashion.com',
+        })
+      } else {
+        await exportToPdf('Products', 'products', productExportColumns, rows, {
+          brandTitle: 'GBB Fashion Product Catalog',
+          brandSubtitle: 'www.gbbfashion.com',
+        })
+      }
+      toast.success(format === 'excel' ? 'Excel exported' : 'PDF exported')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Export failed')
+    }
+  }
+
+  const handleExportOrders = async (format: 'excel' | 'pdf') => {
+    try {
+      const { columns, rows } = buildOrderExport()
+      const exportOpts = {
+        grandTotalKey: 'totalAmount',
+        grandTotalLabel: 'Grand Total',
+        brandTitle: 'GBB Fashion Online Orders',
+        brandSubtitle: 'www.gbbfashion.com',
+      }
+      if (format === 'excel') {
+        await exportToExcel('orders', 'Orders', columns, rows, exportOpts)
+      } else {
+        await exportToPdf('Orders', 'orders', columns, rows, exportOpts)
+      }
+      toast.success(format === 'excel' ? 'Excel exported' : 'PDF exported')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Export failed')
+    }
+  }
 
   // ─── Sidebar navigation items ──────────────────────────────────────────────
 
@@ -908,72 +1522,70 @@ export function AdminDashboard() {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — fixed to viewport; height independent of main content */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white transform transition-transform duration-300 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-64 flex-col bg-slate-900 text-white transform transition-transform duration-300 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="px-6 py-5 flex items-center justify-between border-b border-slate-700/50">
-            <div className="flex items-center gap-2">
-                <span
-                  className="relative shrink-0 overflow-hidden rounded-lg bg-white/10"
-                  style={{
-                    width: Math.min(logoWidth, 48),
-                    height: Math.min(logoHeight, 48),
-                  }}
-                >
-                  <img
-                    src={logoUrl}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-fill object-center"
-                  />
-                </span>
-              <span className="font-bold text-lg tracking-wide">GBB Fashion</span>
-            </div>
-            <button
-              className="lg:hidden text-slate-400 hover:text-white"
-              onClick={() => setSidebarOpen(false)}
+        {/* Logo */}
+        <div className="px-6 py-5 flex items-center justify-between border-b border-slate-700/50 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className="relative shrink-0 overflow-hidden rounded-lg bg-white/10"
+              style={{
+                width: Math.min(logoWidth, 48),
+                height: Math.min(logoHeight, 48),
+              }}
             >
-              <X className="h-5 w-5" />
-            </button>
+              <img
+                src={logoUrl}
+                alt=""
+                className="absolute inset-0 h-full w-full object-fill object-center"
+              />
+            </span>
+            <span className="font-bold text-lg tracking-wide truncate">GBB Fashion</span>
           </div>
+          <button
+            className="lg:hidden text-slate-400 hover:text-white shrink-0"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-          {/* Nav items */}
-          <nav className="flex-1 px-3 py-4 space-y-1">
-            {navItems.map((item) => {
-              const isActive = activePage === item.page
-              return (
-                <button
-                  key={item.page}
-                  onClick={() => {
-                    setActivePage(item.page)
-                    setSidebarOpen(false)
-                  }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-amber-500/15 text-amber-400'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <item.icon className={`h-5 w-5 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
-                  <span>{item.label}</span>
-                  {isActive && (
-                    <div className="ml-auto h-1.5 w-1.5 rounded-full bg-amber-400" />
-                  )}
-                </button>
-              )
-            })}
-          </nav>
+        {/* Nav items — scroll if needed */}
+        <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1">
+          {navItems.map((item) => {
+            const isActive = activePage === item.page
+            return (
+              <button
+                key={item.page}
+                onClick={() => {
+                  goToPage(item.page)
+                  setSidebarOpen(false)
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-amber-500/15 text-amber-400'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <item.icon className={`h-5 w-5 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
+                <span>{item.label}</span>
+                {isActive && (
+                  <div className="ml-auto h-1.5 w-1.5 rounded-full bg-amber-400" />
+                )}
+              </button>
+            )
+          })}
+        </nav>
 
-          <Separator className="bg-slate-700/50" />
-
-          {/* Bottom nav */}
+        {/* Bottom actions — always pinned to viewport bottom */}
+        <div className="shrink-0 border-t border-slate-700/50">
           <div className="px-3 py-4 space-y-1">
             <button
-              onClick={() => setView('home')}
+              onClick={goToWebsite}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
             >
               <Home className="h-5 w-5 text-slate-400" />
@@ -988,12 +1600,11 @@ export function AdminDashboard() {
             </button>
           </div>
 
-          {/* User info */}
           {user && (
             <button
               type="button"
               onClick={() => {
-                setActivePage('profile')
+                goToPage('profile')
                 setSidebarOpen(false)
               }}
               className="px-4 py-3 border-t border-slate-700/50 text-left w-full hover:bg-slate-800/60 transition-colors"
@@ -1008,8 +1619,11 @@ export function AdminDashboard() {
         </div>
       </aside>
 
+      {/* Spacer so main content clears the fixed sidebar on desktop */}
+      <div className="hidden lg:block w-64 shrink-0" aria-hidden />
+
       {/* Main content */}
-      <main className="flex-1 min-h-screen flex flex-col">
+      <main className="flex-1 min-w-0 min-h-screen flex flex-col">
         {/* Top bar on mobile */}
         <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
           <button
@@ -1073,6 +1687,40 @@ export function AdminDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <OrderCashReceivedDialog
+        open={!!cashReceivedOrder}
+        onOpenChange={(open) => {
+          if (!open) setCashReceivedOrder(null)
+        }}
+        order={cashReceivedOrder}
+        currencySymbol={currencySymbol}
+        confirming={cashReceivedOrder ? savingOrderId === cashReceivedOrder.id : false}
+        onConfirm={() => {
+          if (cashReceivedOrder) void handleCashReceived(cashReceivedOrder.id)
+        }}
+      />
+
+      <OrderConfirmDialog
+        open={!!confirmOrder}
+        onOpenChange={(open) => {
+          if (!open) setConfirmOrder(null)
+        }}
+        order={confirmOrder}
+        products={products}
+        currencySymbol={currencySymbol}
+        confirming={confirmOrder ? savingOrderId === confirmOrder.id : false}
+        onOrderUpdated={(updated) => {
+          setConfirmOrder(updated)
+          setOrders((prev) =>
+            prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)),
+          )
+          fetchProducts()
+        }}
+        onConfirm={() => {
+          if (confirmOrder) void handleConfirmOrder(confirmOrder.id)
+        }}
+      />
 
       <OrderInvoiceDialog
         open={!!invoiceOrder}
@@ -1594,7 +2242,7 @@ export function AdminDashboard() {
               variant="ghost"
               size="sm"
               className="text-amber-600 hover:text-amber-700"
-              onClick={() => setActivePage('orders')}
+              onClick={() => goToPage('orders')}
             >
               View All
             </Button>
@@ -1685,7 +2333,7 @@ export function AdminDashboard() {
                 Add Reel
               </Button>
               <Button
-                onClick={() => setActivePage('orders')}
+                onClick={() => goToPage('orders')}
                 variant="outline"
                 className="rounded-lg"
               >
@@ -1774,7 +2422,7 @@ export function AdminDashboard() {
             <Card className="rounded-xl border-slate-200 shadow-sm overflow-hidden p-0 gap-0">
               <div className="px-4 sm:px-5 py-3 border-b border-slate-100 bg-white">
                 <h3 className="text-sm font-semibold text-slate-900">Product data</h3>
-                <p className="text-xs text-slate-500 mt-0.5">General pricing & details</p>
+                <p className="text-xs text-slate-500 mt-0.5">Base pricing used when colors/sizes are set to “Base”</p>
               </div>
               <CardContent className="p-4 sm:p-5 space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1878,7 +2526,7 @@ export function AdminDashboard() {
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900">Color gallery</h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Upload an image per color — homepage swatches will swap to that image
+                    Image, swatch, sizes, and stock per color — total stock updates automatically
                   </p>
                 </div>
                 <Button
@@ -1900,114 +2548,347 @@ export function AdminDashboard() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {colorVariants.map((variant, index) => (
+                    {colorVariants.map((variant, index) => {
+                      const hasSizes = Boolean(variant.sizes && variant.sizes.length > 0)
+                      const usedSizeLabels = new Set(
+                        (variant.sizes || []).map((s) => s.label.trim().toLowerCase())
+                      )
+                      return (
                       <div
                         key={index}
-                        className="grid grid-cols-1 sm:grid-cols-[96px_1fr_auto] gap-3 items-start rounded-xl border border-slate-200 bg-white p-3"
+                        className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4 space-y-3"
                       >
-                        <div className="relative aspect-square w-24 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden">
-                          {variant.image ? (
-                            <img
-                              src={variant.image}
-                              alt={variant.name}
-                              className="absolute inset-0 h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-slate-300">
-                              <ImageIcon className="h-6 w-6" />
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          {/* Image + media actions */}
+                          <div className="flex sm:flex-col items-center gap-3 sm:w-28 shrink-0">
+                            <div className="relative aspect-square w-24 sm:w-full rounded-lg border border-slate-200 bg-slate-50 overflow-hidden">
+                              {variant.image ? (
+                                <img
+                                  src={variant.image}
+                                  alt={variant.name}
+                                  className="absolute inset-0 h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="absolute inset-0 flex items-center justify-center text-slate-300">
+                                  <ImageIcon className="h-6 w-6" />
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2 min-w-0">
-                          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-                            <Input
-                              value={variant.name}
-                              onChange={(e) =>
-                                setColorVariants((prev) =>
-                                  prev.map((v, i) =>
-                                    i === index ? { ...v, name: e.target.value } : v
-                                  )
-                                )
-                              }
-                              placeholder="Color name (e.g. Black)"
-                            />
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="color"
-                                value={/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(variant.swatch) ? variant.swatch : '#888888'}
-                                onChange={(e) =>
-                                  setColorVariants((prev) =>
-                                    prev.map((v, i) =>
-                                      i === index ? { ...v, swatch: e.target.value } : v
-                                    )
-                                  )
-                                }
-                                className="h-10 w-12 cursor-pointer rounded border border-slate-200 bg-white p-1"
-                                title="Swatch color"
-                              />
-                              <Input
-                                value={variant.swatch}
-                                onChange={(e) =>
-                                  setColorVariants((prev) =>
-                                    prev.map((v, i) =>
-                                      i === index ? { ...v, swatch: e.target.value } : v
-                                    )
-                                  )
-                                }
-                                placeholder="#1a1a1a"
-                                className="w-[110px]"
-                              />
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-xs"
-                              onClick={() => setMediaPicker(index)}
-                            >
-                              <Images className="h-3 w-3 mr-1" />
-                              Select / Upload
-                            </Button>
-                            {variant.image ? (
+                            <div className="flex flex-col gap-1.5 w-full min-w-0">
                               <Button
                                 type="button"
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                className="h-8 text-xs"
-                                onClick={() =>
-                                  setColorVariants((prev) =>
-                                    prev.map((v, i) => (i === index ? { ...v, image: '' } : v))
-                                  )
-                                }
+                                className="h-8 w-full text-xs"
+                                onClick={() => setMediaPicker(index)}
                               >
-                                Clear image
+                                <Images className="h-3 w-3 mr-1 shrink-0" />
+                                Select / Upload
                               </Button>
-                            ) : null}
+                              {variant.image ? (
+                                <button
+                                  type="button"
+                                  className="text-[11px] text-slate-500 hover:text-slate-800 underline-offset-2 hover:underline"
+                                  onClick={() =>
+                                    setColorVariants((prev) =>
+                                      prev.map((v, i) =>
+                                        i === index ? { ...v, image: '' } : v
+                                      )
+                                    )
+                                  }
+                                >
+                                  Clear image
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
 
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-500 hover:text-red-700 shrink-0"
-                          onClick={() => removeColorVariant(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          {/* Fields */}
+                          <div className="flex-1 min-w-0 space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                              <div className="sm:col-span-5 space-y-1.5">
+                                <Label className="text-xs text-slate-500">Color name</Label>
+                                <Input
+                                  value={variant.name}
+                                  onChange={(e) =>
+                                    setColorVariants((prev) =>
+                                      prev.map((v, i) =>
+                                        i === index ? { ...v, name: e.target.value } : v
+                                      )
+                                    )
+                                  }
+                                  placeholder="e.g. Black"
+                                />
+                              </div>
+                              <div className="sm:col-span-4 space-y-1.5">
+                                <Label className="text-xs text-slate-500">Swatch</Label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    value={
+                                      /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(variant.swatch)
+                                        ? variant.swatch
+                                        : '#888888'
+                                    }
+                                    onChange={(e) =>
+                                      setColorVariants((prev) =>
+                                        prev.map((v, i) =>
+                                          i === index
+                                            ? { ...v, swatch: e.target.value }
+                                            : v
+                                        )
+                                      )
+                                    }
+                                    className="h-10 w-11 shrink-0 cursor-pointer rounded-md border border-slate-200 bg-white p-1"
+                                    title="Swatch color"
+                                  />
+                                  <Input
+                                    value={variant.swatch}
+                                    onChange={(e) =>
+                                      setColorVariants((prev) =>
+                                        prev.map((v, i) =>
+                                          i === index
+                                            ? { ...v, swatch: e.target.value }
+                                            : v
+                                        )
+                                      )
+                                    }
+                                    placeholder="#1a1a1a"
+                                    className="font-mono text-sm"
+                                  />
+                                </div>
+                              </div>
+                              <div className="sm:col-span-3 space-y-1.5">
+                                <Label
+                                  htmlFor={`color-qty-${index}`}
+                                  className="text-xs text-slate-500"
+                                >
+                                  {hasSizes ? 'Total qty' : 'Qty'}
+                                </Label>
+                                <Input
+                                  id={`color-qty-${index}`}
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  readOnly={hasSizes}
+                                  value={
+                                    hasSizes
+                                      ? sumColorQuantity(variant)
+                                      : typeof variant.quantity === 'number' &&
+                                          Number.isFinite(variant.quantity)
+                                        ? variant.quantity
+                                        : ''
+                                  }
+                                  onChange={(e) => {
+                                    if (hasSizes) return
+                                    updateColorVariantQuantity(index, e.target.value)
+                                  }}
+                                  placeholder="e.g. 10"
+                                  inputMode="numeric"
+                                  className={hasSizes ? 'bg-slate-50' : undefined}
+                                />
+                              </div>
+                            </div>
+
+                            {!hasSizes ? (
+                              <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                                <VariantPricingFields
+                                  idPrefix={`color-${index}`}
+                                  mode={variant.pricingMode}
+                                  price={variant.price}
+                                  originalPrice={variant.originalPrice}
+                                  currencySymbol={currencySymbol}
+                                  basePrice={productForm.price || 0}
+                                  baseOriginalPrice={productForm.originalPrice}
+                                  onModeChange={(mode) => setColorPricingMode(index, mode)}
+                                  onPriceChange={(price) =>
+                                    updateColorVariant(index, { price })
+                                  }
+                                  onOriginalPriceChange={(originalPrice) =>
+                                    updateColorVariant(index, { originalPrice })
+                                  }
+                                />
+                              </div>
+                            ) : null}
+
+                            {/* Sizes for this color */}
+                            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/80 p-3 space-y-2.5">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-xs font-medium text-slate-800">
+                                    Sizes for this color
+                                  </p>
+                                  <p className="text-[11px] text-slate-500">
+                                    Per-size stock and pricing — each size uses base or custom price
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => addSizeToColor(index)}
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add size
+                                </Button>
+                              </div>
+
+                              {!hasSizes ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {SUGGESTED_SIZE_LABELS.filter(
+                                    (label) => !usedSizeLabels.has(label.toLowerCase())
+                                  )
+                                    .slice(0, 8)
+                                    .map((label) => (
+                                      <button
+                                        key={label}
+                                        type="button"
+                                        onClick={() => addSizeToColor(index, label)}
+                                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600 hover:border-slate-400 hover:text-slate-900"
+                                      >
+                                        + {label}
+                                      </button>
+                                    ))}
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  {(variant.sizes || []).map((sizeRow, sizeIndex) => {
+                                    const colorBase = resolveColorPricing(
+                                      variant,
+                                      productForm.price || 0,
+                                      productForm.originalPrice
+                                    )
+                                    return (
+                                    <div
+                                      key={sizeIndex}
+                                      className="rounded-lg border border-slate-200 bg-white p-2.5 space-y-2.5"
+                                    >
+                                      <div className="grid grid-cols-[minmax(0,1fr)_72px_auto] gap-2 items-end">
+                                        <div className="space-y-1 min-w-0">
+                                          <Label className="text-[11px] text-slate-500">
+                                            Size
+                                          </Label>
+                                          <Input
+                                            value={sizeRow.label}
+                                            onChange={(e) =>
+                                              updateColorSize(index, sizeIndex, {
+                                                label: e.target.value,
+                                              })
+                                            }
+                                            placeholder="e.g. M"
+                                            className="h-9"
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <Label className="text-[11px] text-slate-500">
+                                            Qty
+                                          </Label>
+                                          <Input
+                                            type="number"
+                                            min={0}
+                                            step={1}
+                                            value={
+                                              typeof sizeRow.quantity === 'number' &&
+                                              Number.isFinite(sizeRow.quantity)
+                                                ? sizeRow.quantity
+                                                : ''
+                                            }
+                                            onChange={(e) => {
+                                              const raw = e.target.value.trim()
+                                              updateColorSize(index, sizeIndex, {
+                                                quantity:
+                                                  raw === ''
+                                                    ? undefined
+                                                    : normalizeStock(raw, 0),
+                                              })
+                                            }}
+                                            placeholder="0"
+                                            className="h-9"
+                                            inputMode="numeric"
+                                          />
+                                        </div>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-50 self-end"
+                                          onClick={() => removeColorSize(index, sizeIndex)}
+                                          aria-label="Remove size"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </div>
+                                      <div className="border-t border-slate-100 pt-2.5">
+                                        <div className="rounded-md bg-slate-50/80 border border-slate-100 px-2.5 py-2">
+                                          <VariantPricingFields
+                                            idPrefix={`color-${index}-size-${sizeIndex}`}
+                                            compact
+                                            mode={sizeRow.pricingMode}
+                                            price={sizeRow.price}
+                                            originalPrice={sizeRow.originalPrice}
+                                            currencySymbol={currencySymbol}
+                                            basePrice={colorBase.price}
+                                            baseOriginalPrice={colorBase.originalPrice}
+                                            onModeChange={(mode) =>
+                                              setSizePricingMode(index, sizeIndex, mode)
+                                            }
+                                            onPriceChange={(price) =>
+                                              updateColorSize(index, sizeIndex, { price })
+                                            }
+                                            onOriginalPriceChange={(originalPrice) =>
+                                              updateColorSize(index, sizeIndex, { originalPrice })
+                                            }
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                    )
+                                  })}
+                                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                    {SUGGESTED_SIZE_LABELS.filter(
+                                      (label) =>
+                                        !usedSizeLabels.has(label.toLowerCase())
+                                    )
+                                      .slice(0, 6)
+                                      .map((label) => (
+                                        <button
+                                          key={label}
+                                          type="button"
+                                          onClick={() => addSizeToColor(index, label)}
+                                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600 hover:border-slate-400"
+                                        >
+                                          + {label}
+                                        </button>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 self-start"
+                            onClick={() => removeColorVariant(index)}
+                            aria-label="Remove color"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-5 xl:sticky xl:top-24">
+          {/* Sidebar — sticky without inner scrollbar; tall columns stick from the bottom as you scroll */}
+          <div className="space-y-5 xl:sticky xl:top-[min(1.25rem,calc(100vh-100%))] xl:self-start">
             <Card className="rounded-xl border-slate-200 shadow-sm overflow-hidden p-0 gap-0">
               <div className="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-[#7F54B3]/10 to-transparent">
                 <h3 className="text-sm font-semibold text-slate-900">Publish</h3>
@@ -2020,19 +2901,32 @@ export function AdminDashboard() {
                     type="number"
                     min={0}
                     step={1}
-                    value={productForm.stock}
+                    value={
+                      colorVariants.length > 0
+                        ? productForm.stock
+                        : productForm.stock > 0
+                          ? productForm.stock
+                          : ''
+                    }
+                    readOnly={colorVariants.length > 0}
                     onChange={(e) => {
-                      const stock = normalizeStock(e.target.value, 0)
+                      if (colorVariants.length > 0) return
+                      const raw = e.target.value.trim()
+                      const stock = raw === '' ? 0 : normalizeStock(raw, 0)
                       setProductForm((p) => ({
                         ...p,
                         stock,
                         inStock: inStockFromQuantity(stock),
                       }))
                     }}
+                    placeholder="e.g. 10"
+                    className={colorVariants.length > 0 ? 'bg-slate-50' : undefined}
                   />
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[11px] text-slate-400">
-                      Units available for sale
+                      {colorVariants.length > 0
+                        ? 'Auto total from color / size quantities'
+                        : 'Units available for sale'}
                     </p>
                     <Badge
                       variant={inStockFromQuantity(productForm.stock) ? 'default' : 'destructive'}
@@ -2092,7 +2986,7 @@ export function AdminDashboard() {
                   <div>
                     <p className="text-sm font-medium text-slate-800">Featured</p>
                     <p className="text-[11px] text-slate-400">
-                      New In Trend homepage tab (not Prime Bags/Shoes)
+                      New In Trend + fills empty homepage/front image areas
                     </p>
                   </div>
                   <Switch
@@ -2123,84 +3017,100 @@ export function AdminDashboard() {
               </div>
               <CardContent className="p-4 space-y-4">
                 <div className="space-y-2">
-                  <Label>Category *</Label>
-                  <Select
+                  <Label htmlFor="product-category">Category *</Label>
+                  <select
+                    id="product-category"
+                    className={nativeSelectClassName}
                     value={productForm.category}
-                    onValueChange={(v) =>
-                      setProductForm((p) => ({ ...p, category: v, subCategory: null }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categoryOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Subcategory slug</Label>
-                  <Input
-                    value={productForm.subCategory || ''}
                     onChange={(e) =>
                       setProductForm((p) => ({
                         ...p,
-                        subCategory: e.target.value.trim() || null,
+                        category: e.target.value,
+                        subCategory: null,
                       }))
                     }
-                    placeholder="e.g. shoulder-bag"
-                    className="font-mono text-sm"
-                  />
+                  >
+                    {categoryOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="product-subcategory">Subcategory</Label>
+                  <select
+                    id="product-subcategory"
+                    className={nativeSelectClassName}
+                    value={productForm.subCategory || '__none__'}
+                    disabled={subcategoryOptions.length === 0}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setProductForm((p) => ({
+                        ...p,
+                        subCategory: v === '__none__' ? null : v,
+                      }))
+                    }}
+                  >
+                    <option value="__none__">
+                      {subcategoryOptions.length === 0
+                        ? 'No subcategories for this category'
+                        : 'None'}
+                    </option>
+                    {subcategoryOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                    {productForm.subCategory &&
+                      !subcategoryOptions.some((o) => o.value === productForm.subCategory) && (
+                        <option value={productForm.subCategory}>
+                          {productForm.subCategory} (current)
+                        </option>
+                      )}
+                  </select>
                   <p className="text-[11px] text-slate-400">
-                    Must match a subcategory under Categories
+                    Managed under Categories → edit category → Subcategories
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Badge</Label>
-                  <Select
+                  <Label htmlFor="product-badge">Badge</Label>
+                  <select
+                    id="product-badge"
+                    className={nativeSelectClassName}
                     value={productForm.badge || '__none__'}
-                    onValueChange={(v) =>
+                    onChange={(e) => {
+                      const v = e.target.value
                       setProductForm((p) => ({ ...p, badge: v === '__none__' ? null : v }))
-                    }
+                    }}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="None" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {badgeOptions.map((opt) => (
-                        <SelectItem key={opt.value || '__none__'} value={opt.value || '__none__'}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    {badgeOptions.map((opt) => (
+                      <option key={opt.value || '__none__'} value={opt.value || '__none__'}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Homepage collection</Label>
-                  <Select
+                  <Label htmlFor="product-collection">Homepage collection</Label>
+                  <select
+                    id="product-collection"
+                    className={nativeSelectClassName}
                     value={productForm.collection || '__none__'}
-                    onValueChange={(v) =>
+                    onChange={(e) => {
+                      const v = e.target.value
                       setProductForm((p) => ({
                         ...p,
                         collection: v === '__none__' ? null : v,
                       }))
-                    }
+                    }}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="None" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {collectionOptions.map((opt) => (
-                        <SelectItem key={opt.value || '__none__'} value={opt.value || '__none__'}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    {collectionOptions.map((opt) => (
+                      <option key={opt.value || '__none__'} value={opt.value || '__none__'}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                   <p className="text-[11px] text-slate-400">
                     Assign to Prime Bags or Prime Shoes carousel on the homepage
                   </p>
@@ -2232,13 +3142,39 @@ export function AdminDashboard() {
               {productSearch.trim() ? ' matching search' : ''}
             </p>
           </div>
-          <Button
-            onClick={openCreateProduct}
-            className="bg-[#7F54B3] hover:bg-[#6d47a0] text-white rounded-lg shadow-sm"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add product
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-lg"
+                  disabled={filteredProducts.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-1.5" />
+                  Export
+                  <ChevronDown className="h-3.5 w-3.5 ml-1.5 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => handleExportProducts('excel')}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Export Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExportProducts('pdf')}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              onClick={openCreateProduct}
+              className="bg-[#7F54B3] hover:bg-[#6d47a0] text-white rounded-lg shadow-sm"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add product
+            </Button>
+          </div>
         </div>
 
         <div className="relative max-w-sm">
@@ -2260,6 +3196,7 @@ export function AdminDashboard() {
                     <TableHead>Image</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead>Colors</TableHead>
                     <TableHead>Price ({currencySymbol})</TableHead>
                     <TableHead>Stock</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -2268,7 +3205,7 @@ export function AdminDashboard() {
                 <TableBody>
                   {paginatedProducts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-10 text-slate-500">
+                      <TableCell colSpan={7} className="text-center py-10 text-slate-500">
                         No products found
                       </TableCell>
                     </TableRow>
@@ -2301,6 +3238,60 @@ export function AdminDashboard() {
                           </div>
                         </TableCell>
                         <TableCell className="capitalize text-slate-600">{product.category}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const colors = parseGalleryImages(
+                              product.galleryImages
+                            ).filter((c) => c.name)
+                            if (colors.length === 0) {
+                              const legacy = (product.colors || '')
+                                .split(',')
+                                .map((n) => n.trim())
+                                .filter(Boolean)
+                              if (legacy.length === 0) {
+                                return (
+                                  <span className="text-xs text-slate-400">—</span>
+                                )
+                              }
+                              return (
+                                <div className="flex flex-wrap items-center gap-1.5 max-w-[140px]">
+                                  {legacy.slice(0, 6).map((name) => (
+                                    <span
+                                      key={name}
+                                      title={name}
+                                      className="inline-block h-4 w-4 rounded-full border border-slate-200"
+                                      style={{
+                                        backgroundColor: swatchForColorName(name),
+                                      }}
+                                    />
+                                  ))}
+                                  {legacy.length > 6 ? (
+                                    <span className="text-[10px] text-slate-400">
+                                      +{legacy.length - 6}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              )
+                            }
+                            return (
+                              <div className="flex flex-wrap items-center gap-1.5 max-w-[160px]">
+                                {colors.slice(0, 6).map((c) => (
+                                  <span
+                                    key={`${c.name}-${c.swatch}`}
+                                    title={c.name}
+                                    className="inline-block h-4 w-4 rounded-full border border-slate-200 shrink-0"
+                                    style={{ backgroundColor: c.swatch || '#888' }}
+                                  />
+                                ))}
+                                {colors.length > 6 ? (
+                                  <span className="text-[10px] text-slate-400">
+                                    +{colors.length - 6}
+                                  </span>
+                                ) : null}
+                              </div>
+                            )
+                          })()}
+                        </TableCell>
                         <TableCell className="font-medium">{currencySymbol}{product.price.toLocaleString()}</TableCell>
                         <TableCell>
                           {(() => {
@@ -2589,12 +3580,124 @@ export function AdminDashboard() {
 
   function OrdersPage() {
     const statusFilters = ['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled']
+    const orderColSpan = 11
 
     return (
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Orders</h2>
-          <p className="text-slate-500 text-sm mt-1">{orders.length} total orders</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Orders</h2>
+            <p className="text-slate-500 text-sm mt-1">
+              {filteredOrders.length} of {orders.length} orders
+              {ordersHaveActiveFilters ? ' matching filters' : ''}
+            </p>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-lg shrink-0"
+                disabled={filteredOrders.length === 0}
+              >
+                <Download className="h-4 w-4 mr-1.5" />
+                Export
+                <ChevronDown className="h-3.5 w-3.5 ml-1.5 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onClick={() => handleExportOrders('excel')}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportOrders('pdf')}>
+                <FileText className="h-4 w-4 mr-2" />
+                Export PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+                placeholder="Search by order ID, customer, product, color, size..."
+                className="pl-9"
+              />
+            </div>
+            <Select
+              value={orderDatePreset}
+              onValueChange={(v) =>
+                setOrderDatePreset(
+                  v === 'today' ||
+                    v === 'yesterday' ||
+                    v === 'week' ||
+                    v === 'month' ||
+                    v === 'year' ||
+                    v === 'custom'
+                    ? v
+                    : 'all',
+                )
+              }
+            >
+              <SelectTrigger className="w-full lg:w-[180px]">
+                <SelectValue placeholder="Date" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All dates</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="yesterday">Yesterday</SelectItem>
+                <SelectItem value="week">This week</SelectItem>
+                <SelectItem value="month">This month</SelectItem>
+                <SelectItem value="year">This year</SelectItem>
+                <SelectItem value="custom">Custom range</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={orderSort}
+              onValueChange={(v) => setOrderSort(v === 'oldest' ? 'oldest' : 'newest')}
+            >
+              <SelectTrigger className="w-full lg:w-[160px]">
+                <SelectValue placeholder="Sort" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest first</SelectItem>
+                <SelectItem value="oldest">Oldest first</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {orderDatePreset === 'custom' && (
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="order-date-from" className="text-sm text-slate-600 shrink-0">
+                  From
+                </Label>
+                <Input
+                  id="order-date-from"
+                  type="date"
+                  value={orderDateFrom}
+                  onChange={(e) => setOrderDateFrom(e.target.value)}
+                  className="w-full sm:w-[160px]"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="order-date-to" className="text-sm text-slate-600 shrink-0">
+                  To
+                </Label>
+                <Input
+                  id="order-date-to"
+                  type="date"
+                  value={orderDateTo}
+                  onChange={(e) => setOrderDateTo(e.target.value)}
+                  className="w-full sm:w-[160px]"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Status filters */}
@@ -2630,6 +3733,8 @@ export function AdminDashboard() {
                     <TableHead>Order ID</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Items</TableHead>
+                    <TableHead>Color</TableHead>
+                    <TableHead>Size</TableHead>
                     <TableHead>Total ({currencySymbol})</TableHead>
                     <TableHead>Payment</TableHead>
                     <TableHead>Status</TableHead>
@@ -2640,12 +3745,15 @@ export function AdminDashboard() {
                 <TableBody>
                   {filteredOrders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-slate-500">
+                      <TableCell colSpan={orderColSpan} className="text-center py-8 text-slate-500">
                         No orders found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredOrders.map((order) => (
+                    filteredOrders.map((order) => {
+                      const variantSummary = summarizeOrderVariants(order.items)
+                      const isPending = order.status === 'pending'
+                      return (
                       <Fragment key={order.id}>
                         <TableRow>
                           <TableCell>
@@ -2674,6 +3782,24 @@ export function AdminDashboard() {
                           </TableCell>
                           <TableCell className="text-sm text-slate-600">
                             {order.items.length} item(s)
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-600 max-w-[120px]">
+                            {variantSummary.colors.length > 0 ? (
+                              <span className="line-clamp-2" title={variantSummary.colors.join(', ')}>
+                                {variantSummary.colors.join(', ')}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-600 max-w-[100px]">
+                            {variantSummary.sizes.length > 0 ? (
+                              <span className="line-clamp-2" title={variantSummary.sizes.join(', ')}>
+                                {variantSummary.sizes.join(', ')}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="font-medium">
                             {currencySymbol}{order.totalAmount.toLocaleString()}
@@ -2713,6 +3839,24 @@ export function AdminDashboard() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="inline-flex items-center justify-end gap-2">
+                              {isPending ? (
+                                <Button
+                                  size="sm"
+                                  className="h-8 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-3"
+                                  disabled={savingOrderId === order.id}
+                                  onClick={() => setConfirmOrder(order)}
+                                >
+                                  {savingOrderId === order.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                                      Confirm order
+                                    </>
+                                  )}
+                                </Button>
+                              ) : (
+                                <>
                               <Select
                                 value={draftOrderStatuses[order.id] ?? order.status}
                                 onValueChange={(value) =>
@@ -2765,7 +3909,7 @@ export function AdminDashboard() {
                                   className="h-8 rounded-lg px-2.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                                   title="Cash received"
                                   disabled={savingOrderId === order.id}
-                                  onClick={() => void handleCashReceived(order.id)}
+                                  onClick={() => setCashReceivedOrder(order)}
                                 >
                                   {savingOrderId === order.id ? (
                                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2794,15 +3938,32 @@ export function AdminDashboard() {
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
+                                </>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
                         {expandedOrder === order.id && (
                           <TableRow>
-                            <TableCell colSpan={9} className="bg-slate-50/50 px-8 py-4">
+                            <TableCell colSpan={orderColSpan} className="bg-slate-50/50 px-8 py-4">
                               <div className="space-y-3">
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                   <p className="text-sm font-medium text-slate-700">Order Items</p>
+                                  {isPending ? (
+                                    <Button
+                                      size="sm"
+                                      className="rounded-lg h-8 bg-emerald-700 hover:bg-emerald-800 text-white"
+                                      disabled={savingOrderId === order.id}
+                                      onClick={() => setConfirmOrder(order)}
+                                    >
+                                      {savingOrderId === order.id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                                      ) : (
+                                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                      )}
+                                      Confirm order
+                                    </Button>
+                                  ) : (
                                   <div className="flex flex-wrap items-center gap-2">
                                     {order.paymentMethod === PAYMENT_METHODS.COD &&
                                       order.paymentStatus !== PAYMENT_STATUS.PAID &&
@@ -2811,7 +3972,7 @@ export function AdminDashboard() {
                                         size="sm"
                                         className="rounded-lg h-8 bg-emerald-700 hover:bg-emerald-800 text-white"
                                         disabled={savingOrderId === order.id}
-                                        onClick={() => void handleCashReceived(order.id)}
+                                        onClick={() => setCashReceivedOrder(order)}
                                       >
                                         {savingOrderId === order.id ? (
                                           <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
@@ -2833,20 +3994,48 @@ export function AdminDashboard() {
                                       </Button>
                                     )}
                                   </div>
+                                  )}
                                 </div>
-                                {order.items.map((item) => (
+                                {isPending && (
+                                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                                    Confirm this order to unlock status updates, payment, invoice, and delete actions.
+                                  </p>
+                                )}
+                                <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                                  <div className="grid grid-cols-[1fr_88px_72px_64px_88px] gap-2 px-3 py-2 bg-slate-50 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                    <span>Product</span>
+                                    <span>Color</span>
+                                    <span>Size</span>
+                                    <span className="text-right">Qty</span>
+                                    <span className="text-right">Total</span>
+                                  </div>
+                                {order.items.map((item) => {
+                                  const color = resolveOrderItemColor(null, item.productName)
+                                  const size = resolveOrderItemSize(null, item.productName)
+                                  return (
                                   <div
                                     key={item.id}
-                                    className="flex items-center justify-between text-sm"
+                                    className="grid grid-cols-[1fr_88px_72px_64px_88px] gap-2 px-3 py-2 text-sm border-t border-slate-100 items-center"
                                   >
-                                    <span className="text-slate-600">
-                                      {item.productName} × {item.quantity}
+                                    <span className="text-slate-700 line-clamp-2">
+                                      {orderItemBaseName(item.productName)}
                                     </span>
-                                    <span className="font-medium text-slate-900">
+                                    <span className="text-slate-600">
+                                      {color || '—'}
+                                    </span>
+                                    <span className="text-slate-600">
+                                      {size || '—'}
+                                    </span>
+                                    <span className="text-slate-600 text-right tabular-nums">
+                                      {item.quantity}
+                                    </span>
+                                    <span className="font-medium text-slate-900 text-right tabular-nums">
                                       {currencySymbol}{(item.price * item.quantity).toLocaleString()}
                                     </span>
                                   </div>
-                                ))}
+                                  )
+                                })}
+                                </div>
                                 {(order.shippingAddress || order.city) && (
                                   <>
                                     <Separator />
@@ -2918,7 +4107,8 @@ export function AdminDashboard() {
                           </TableRow>
                         )}
                       </Fragment>
-                    ))
+                      )
+                    })
                   )}
                 </TableBody>
               </Table>

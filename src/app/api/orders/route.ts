@@ -17,12 +17,18 @@ import {
 } from '@/lib/sslcommerz'
 import { getSiteSettings } from '@/lib/site-settings'
 import { sendOrderInvoiceEmail } from '@/lib/order-invoice-mail'
+import {
+  deductStockForOrderItems,
+  restoreStockForOrderItems,
+} from '@/lib/order-stock'
 
 type OrderItemInput = {
   productId: string
   productName: string
   quantity: number
   price: number
+  color?: string | null
+  size?: string | null
 }
 
 function parseItems(raw: unknown): OrderItemInput[] | null {
@@ -35,11 +41,26 @@ function parseItems(raw: unknown): OrderItemInput[] | null {
     const productName = typeof row.productName === 'string' ? row.productName : ''
     const quantity = Number(row.quantity)
     const price = Number(row.price)
+    const color =
+      typeof row.color === 'string' && row.color.trim()
+        ? row.color.trim()
+        : null
+    const size =
+      typeof row.size === 'string' && row.size.trim()
+        ? row.size.trim()
+        : null
     if (!productId || !productName || !Number.isFinite(quantity) || quantity < 1) {
       return null
     }
     if (!Number.isFinite(price) || price < 0) return null
-    items.push({ productId, productName, quantity: Math.floor(quantity), price })
+    items.push({
+      productId,
+      productName,
+      quantity: Math.floor(quantity),
+      price,
+      color,
+      size,
+    })
   }
   return items
 }
@@ -159,33 +180,60 @@ export async function POST(request: NextRequest) {
     const orderId = await createUniqueOrderId()
     const isOnline = paymentMethod === PAYMENT_METHODS.SSLCOMMERZ
 
-    const order = await db.order.create({
-      data: {
-        id: orderId,
-        userId: session?.user?.id ?? null,
-        customerName,
-        customerEmail: emailNormalized,
-        customerPhone,
-        shippingAddress,
-        city,
-        state,
-        zipCode,
-        totalAmount,
-        status: 'pending',
-        paymentMethod,
-        paymentStatus: isOnline ? PAYMENT_STATUS.PENDING : PAYMENT_STATUS.UNPAID,
-        transactionId: isOnline ? orderId : null,
-        items: {
-          create: items.map((item) => ({
+    let order
+    try {
+      order = await db.$transaction(async (tx) => {
+        await deductStockForOrderItems(
+          tx,
+          items.map((item) => ({
             productId: item.productId,
             productName: item.productName,
             quantity: item.quantity,
-            price: item.price,
-          })),
-        },
-      },
-      include: { items: true },
-    })
+            color: item.color,
+            size: item.size,
+          }))
+        )
+
+        return tx.order.create({
+          data: {
+            id: orderId,
+            userId: session?.user?.id ?? null,
+            customerName,
+            customerEmail: emailNormalized,
+            customerPhone,
+            shippingAddress,
+            city,
+            state,
+            zipCode,
+            totalAmount,
+            status: 'pending',
+            paymentMethod,
+            paymentStatus: isOnline ? PAYMENT_STATUS.PENDING : PAYMENT_STATUS.UNPAID,
+            transactionId: isOnline ? orderId : null,
+            items: {
+              create: items.map((item) => ({
+                productId: item.productId,
+                productName: item.productName,
+                quantity: item.quantity,
+                price: item.price,
+              })),
+            },
+          },
+          include: { items: true },
+        })
+      })
+    } catch (stockError) {
+      const message =
+        stockError instanceof Error ? stockError.message : 'Insufficient stock'
+      if (
+        message.toLowerCase().includes('stock') ||
+        message.toLowerCase().includes('left') ||
+        message.toLowerCase().includes('not found')
+      ) {
+        return NextResponse.json({ error: message }, { status: 409 })
+      }
+      throw stockError
+    }
 
     if (session?.user?.id) {
       await db.user.update({
@@ -294,13 +342,23 @@ export async function POST(request: NextRequest) {
 
       if (!gatewayUrl || (sslRes.status || '').toUpperCase() !== 'SUCCESS') {
         console.error('SSLCommerz init failed:', sslRes)
-        await db.order.update({
-          where: { id: order.id },
-          data: {
-            paymentStatus: PAYMENT_STATUS.FAILED,
-            status: 'cancelled',
-            paymentMeta: JSON.stringify(sslRes),
-          },
+        await db.$transaction(async (tx) => {
+          await restoreStockForOrderItems(
+            tx,
+            order.items.map((item) => ({
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+            }))
+          )
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              paymentStatus: PAYMENT_STATUS.FAILED,
+              status: 'cancelled',
+              paymentMeta: JSON.stringify(sslRes),
+            },
+          })
         })
         return NextResponse.json(
           {
@@ -324,15 +382,25 @@ export async function POST(request: NextRequest) {
       })
     } catch (error) {
       console.error('SSLCommerz init exception:', error)
-      await db.order.update({
-        where: { id: order.id },
-        data: {
-          paymentStatus: PAYMENT_STATUS.FAILED,
-          status: 'cancelled',
-          paymentMeta: JSON.stringify({
-            error: error instanceof Error ? error.message : 'init failed',
-          }),
-        },
+      await db.$transaction(async (tx) => {
+        await restoreStockForOrderItems(
+          tx,
+          order.items.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+          }))
+        )
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            paymentStatus: PAYMENT_STATUS.FAILED,
+            status: 'cancelled',
+            paymentMeta: JSON.stringify({
+              error: error instanceof Error ? error.message : 'init failed',
+            }),
+          },
+        })
       })
       return NextResponse.json(
         { error: 'Payment gateway unavailable', orderId: order.id },

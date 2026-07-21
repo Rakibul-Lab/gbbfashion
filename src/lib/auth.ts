@@ -37,20 +37,36 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
-        token.role = (user as { role: string }).role
+        token.role = user.role
       }
+
+      // Always refresh role from DB so admin sessions survive refresh / old tokens
+      if (token.id) {
+        try {
+          const dbUser = await db.user.findUnique({
+            where: { id: String(token.id) },
+            select: { role: true },
+          })
+          if (dbUser?.role) {
+            token.role = dbUser.role
+          }
+        } catch {
+          // keep existing token.role
+        }
+      }
+
       return token
     },
     async session({ session, token }) {
       if (session.user) {
-        ;(session.user as { id: string }).id = token.id as string
-        ;(session.user as { role: string }).role = token.role as string
+        session.user.id = String(token.id || '')
+        session.user.role = String(token.role || 'customer')
       }
       return session
     },
   },
   pages: {
-    signIn: '/?view=login',
+    signIn: '/login',
   },
   session: {
     strategy: 'jwt',

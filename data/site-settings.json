@@ -3,10 +3,10 @@
   "logoWidth": 60,
   "logoHeight": 70,
   "heroMediaType": "image",
-  "heroMediaUrl": "",
+  "heroMediaUrl": "/uploads/branding/main-hero-image-jpg.jpg",
   "currencyCode": "BDT",
   "whatsappNumber": "8801335107218",
-  "whatsappIconId": "dark",
+  "whatsappIconId": "classic",
   "whatsappIconUrl": "",
   "freeDeliveryMin": 2000,
   "deliveryCharge": 100,
@@ -220,5 +220,5 @@
     "message": "GBB Fashion is undergoing scheduled maintenance to improve your shopping experience. Thank you for your patience.",
     "eta": ""
   },
-  "updatedAt": "2026-07-16T06:42:07.626Z"
+  "updatedAt": "2026-07-21T10:50:51.282Z"
 }

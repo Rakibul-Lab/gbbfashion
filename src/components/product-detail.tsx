@@ -10,9 +10,16 @@ import { QuantityInput } from '@/components/quantity-input'
 import { ProductColorSwatches } from '@/components/product-color-swatches'
 import {
   resolveProductColorVariants,
-  resolveProductGallery,
+  resolveProductDetailGallery,
+  galleryHasExplicitQuantities,
+  colorHasSizes,
+  getSizeQuantity,
+  sumColorQuantity,
+  formatVariantSuffix,
   type ProductColorVariant,
 } from '@/lib/product-colors'
+import { consumePendingProductColor } from '@/lib/pending-product-color'
+import { resolveVariantPricing } from '@/lib/product-pricing'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -58,6 +65,7 @@ export function ProductDetail() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [selectedColor, setSelectedColor] = useState('')
+  const [selectedSize, setSelectedSize] = useState('')
   const [activeImage, setActiveImage] = useState('')
   const lastViewedId = useRef<string | null>(null)
 
@@ -83,9 +91,22 @@ export function ProductDetail() {
         setProduct(data)
         setQuantity(1)
         const variants = resolveProductColorVariants(data)
-        const first = variants[0]
-        setSelectedColor(first?.name || '')
-        setActiveImage(first?.image || data.image)
+        const pendingColor = consumePendingProductColor()
+        const matchedPending = pendingColor
+          ? variants.find((v) => v.name.toLowerCase() === pendingColor.toLowerCase())
+          : null
+        // Detail page never leads with the featured listing image — use listing color or first color
+        const initial = matchedPending || variants[0] || null
+        if (initial) {
+          setSelectedColor(initial.name)
+          setActiveImage(initial.image || data.image)
+          // Size stays unselected until the shopper picks one (when sizes exist)
+          setSelectedSize('')
+        } else {
+          setSelectedColor('')
+          setSelectedSize('')
+          setActiveImage(data.image)
+        }
         if (lastViewedId.current !== data.id) {
           lastViewedId.current = data.id
           trackViewItem({
@@ -121,21 +142,93 @@ export function ProductDetail() {
   )
 
   const gallery = useMemo(
-    () => (product ? resolveProductGallery(product, selectedColor) : []),
+    () => (product ? resolveProductDetailGallery(product, selectedColor) : []),
     [product, selectedColor]
   )
 
   const activeVariant = useMemo(
     () =>
-      colorVariants.find(
-        (v) => v.name.toLowerCase() === selectedColor.toLowerCase()
-      ) || colorVariants[0],
+      selectedColor
+        ? colorVariants.find(
+            (v) => v.name.toLowerCase() === selectedColor.toLowerCase()
+          ) || null
+        : null,
     [colorVariants, selectedColor]
   )
 
-  const selectColor = (variant: ProductColorVariant) => {
+  const sizeOptions = useMemo(
+    () => (activeVariant && colorHasSizes(activeVariant) ? activeVariant.sizes || [] : []),
+    [activeVariant]
+  )
+
+  const availableStock = useMemo(() => {
+    if (!product) return 0
+    if (sizeOptions.length > 0) {
+      if (!selectedSize) {
+        // Size not chosen yet — don't treat as out of stock (button stays clickable for toast)
+        return Math.max(
+          1,
+          (activeVariant?.sizes || []).reduce((sum, s) => sum + (s.quantity || 0), 0)
+        )
+      }
+      return getSizeQuantity(activeVariant, selectedSize)
+    }
+    if (galleryHasExplicitQuantities(product.galleryImages)) {
+      if (activeVariant) {
+        return sumColorQuantity(activeVariant)
+      }
+      return (
+        colorVariants.reduce((sum, v) => sum + sumColorQuantity(v), 0) ||
+        (typeof product.stock === 'number' ? product.stock : product.inStock ? 999 : 0)
+      )
+    }
+    if (typeof product.stock === 'number' && product.stock > 0) return product.stock
+    return product.inStock ? 999 : 0
+  }, [product, activeVariant, sizeOptions, selectedSize, colorVariants])
+
+  const selectionIncomplete =
+    (colorVariants.length > 0 && !selectedColor) ||
+    (sizeOptions.length > 0 && !selectedSize)
+
+  const purchaseBlocked =
+    !selectionIncomplete && availableStock < 1
+
+  useEffect(() => {
+    if (quantity > availableStock && availableStock > 0) {
+      setQuantity(availableStock)
+    }
+  }, [availableStock, quantity])
+
+  // Keep selected size valid when color changes — clear if it doesn't belong to the color
+  useEffect(() => {
+    if (!activeVariant) return
+    if (!colorHasSizes(activeVariant)) {
+      if (selectedSize) setSelectedSize('')
+      return
+    }
+    const sizes = activeVariant.sizes || []
+    const stillValid = sizes.some(
+      (s) => s.label.toLowerCase() === selectedSize.toLowerCase()
+    )
+    if (selectedSize && !stillValid) {
+      setSelectedSize('')
+    }
+  }, [activeVariant, selectedSize])
+
+  const selectColor = (variant: ProductColorVariant | null) => {
+    // On product detail, always keep a color when variants exist (no featured-image fallback)
+    if (!variant) {
+      const fallback = colorVariants[0]
+      if (fallback) {
+        setSelectedColor(fallback.name)
+        setActiveImage(fallback.image || product?.image || '')
+        setSelectedSize('')
+      }
+      return
+    }
     setSelectedColor(variant.name)
     if (variant.image) setActiveImage(variant.image)
+    setSelectedSize('')
   }
 
   const selectThumb = (src: string) => {
@@ -183,35 +276,59 @@ export function ProductDetail() {
     .filter(Boolean)
 
   const displayImage = activeImage || product.image
+  const resolvedPricing = resolveVariantPricing(
+    activeVariant,
+    sizeOptions.length > 0 ? selectedSize : null,
+    product.price,
+    product.originalPrice
+  )
+  const unitPrice = resolvedPricing.price
+  const unitCompareAt = resolvedPricing.originalPrice
   const hasDiscount =
-    !!product.originalPrice && product.originalPrice > product.price
+    unitCompareAt != null && unitCompareAt > unitPrice
 
-  const lineTotal = product.price * quantity
-  const compareTotal =
-    hasDiscount && product.originalPrice
-      ? product.originalPrice * quantity
-      : null
+  const lineTotal = unitPrice * quantity
+  const compareTotal = hasDiscount ? unitCompareAt! * quantity : null
 
   const addCurrentProductToCart = () => {
+    if (colorVariants.length > 0 && !selectedColor) {
+      toast.error('Please select a color')
+      return null
+    }
+
     const color = activeVariant?.name || selectedColor || null
+
+    if (activeVariant && colorHasSizes(activeVariant) && !selectedSize) {
+      toast.error('Please select a size')
+      return null
+    }
+
+    if (availableStock < 1) {
+      toast.error('This option is out of stock')
+      return null
+    }
+
     const image = displayImage
     addToCart(
       {
         productId: product.id,
         name: product.name,
-        price: product.price,
+        price: unitPrice,
         image,
         color,
         colorSwatch: activeVariant?.swatch || null,
+        size: sizeOptions.length > 0 ? selectedSize : null,
       },
       quantity
     )
 
-    return color && color !== 'Default' ? `${product.name} (${color})` : product.name
+    const suffix = formatVariantSuffix(color, sizeOptions.length > 0 ? selectedSize : null)
+    return suffix ? `${product.name} (${suffix})` : product.name
   }
 
   const handleAddToCart = () => {
     const label = addCurrentProductToCart()
+    if (!label) return
     toast.success(`${quantity}× ${label} added to cart`, {
       action: {
         label: 'View Cart',
@@ -221,7 +338,8 @@ export function ProductDetail() {
   }
 
   const handleBuyNow = () => {
-    addCurrentProductToCart()
+    const label = addCurrentProductToCart()
+    if (!label) return
     setView('checkout')
   }
 
@@ -351,23 +469,27 @@ export function ProductDetail() {
             </h1>
 
             <p className="mt-3 text-sm text-slate-500">
-              {product.inStock ? 'In Stock' : 'Out of Stock'}
+              {availableStock > 0
+                ? sizeOptions.length > 0 && selectedSize
+                  ? `${availableStock} in stock (${selectedSize})`
+                  : 'In Stock'
+                : 'Out of Stock'}
             </p>
 
             <div className="mt-4 space-y-1">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span className="text-3xl font-bold text-slate-900 tabular-nums">
-                  {format(lineTotal)}
+                  {format(quantity > 1 ? lineTotal : unitPrice)}
                 </span>
-                {compareTotal !== null && (
+                {hasDiscount && (
                   <span className="text-lg text-slate-400 line-through tabular-nums">
-                    {format(compareTotal)}
+                    {format(quantity > 1 ? compareTotal! : unitCompareAt!)}
                   </span>
                 )}
               </div>
               {quantity > 1 && (
                 <p className="text-sm text-slate-500">
-                  {format(product.price)} each × {quantity}
+                  {format(unitPrice)} each × {quantity}
                 </p>
               )}
             </div>
@@ -377,10 +499,11 @@ export function ProductDetail() {
             <div className="space-y-3">
               <ProductColorSwatches
                 variants={colorVariants}
-                selectedName={selectedColor || colorVariants[0]?.name || ''}
+                selectedName={selectedColor}
                 onSelect={selectColor}
                 size="lg"
                 showLabel
+                allowDeselect={false}
               />
               {colorVariants.length > 1 && (
                 <p className="text-xs text-slate-400">
@@ -388,6 +511,66 @@ export function ProductDetail() {
                 </p>
               )}
             </div>
+
+            {sizeOptions.length > 0 && (
+              <div className="mt-5 space-y-2">
+                <p className="text-sm text-slate-600">
+                  Size:{' '}
+                  <span className="font-medium text-slate-900">
+                    {selectedSize || 'Select'}
+                  </span>
+                </p>
+                <div
+                  className="flex flex-wrap gap-2"
+                  role="radiogroup"
+                  aria-label="Choose size"
+                >
+                  {sizeOptions.map((sizeRow) => {
+                    const qty = getSizeQuantity(activeVariant, sizeRow.label)
+                    const sizePricing = resolveVariantPricing(
+                      activeVariant,
+                      sizeRow.label,
+                      product.price,
+                      product.originalPrice
+                    )
+                    const isActive =
+                      sizeRow.label.toLowerCase() === selectedSize.toLowerCase()
+                    const soldOut = qty < 1
+                    return (
+                      <button
+                        key={sizeRow.label}
+                        type="button"
+                        role="radio"
+                        aria-checked={isActive}
+                        disabled={soldOut}
+                        onClick={() => {
+                          setSelectedSize(sizeRow.label)
+                          setQuantity(1)
+                        }}
+                        className={`min-w-[3.5rem] rounded-lg border px-3 py-2 text-sm font-medium transition-colors flex flex-col items-center gap-0.5 ${
+                          soldOut
+                            ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300 line-through'
+                            : isActive
+                              ? 'border-slate-900 bg-slate-900 text-white'
+                              : 'border-slate-200 bg-white text-slate-800 hover:border-slate-400'
+                        }`}
+                      >
+                        <span>{sizeRow.label}</span>
+                        {!soldOut && (
+                          <span
+                            className={`text-[10px] font-normal tabular-nums ${
+                              isActive ? 'text-white/80' : 'text-slate-500'
+                            }`}
+                          >
+                            {format(sizePricing.price)}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             <Separator className="my-6" />
 
@@ -415,19 +598,13 @@ export function ProductDetail() {
               <QuantityInput
                 value={quantity}
                 onChange={setQuantity}
-                max={
-                  typeof product.stock === 'number' && product.stock > 0
-                    ? product.stock
-                    : product.inStock
-                      ? 999
-                      : 1
-                }
+                max={availableStock > 0 ? availableStock : 1}
                 className="shrink-0"
               />
               <Button
                 size="lg"
                 onClick={handleAddToCart}
-                disabled={!product.inStock}
+                disabled={purchaseBlocked}
                 className="flex-1 min-w-0 h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-lg shadow-slate-500/25 px-2 sm:px-4"
               >
                 <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />
@@ -437,7 +614,7 @@ export function ProductDetail() {
                 size="lg"
                 variant="outline"
                 onClick={handleBuyNow}
-                disabled={!product.inStock}
+                disabled={purchaseBlocked}
                 className="flex-1 min-w-0 h-11 rounded-xl border-2 border-rose-600 bg-white text-rose-700 hover:bg-rose-600 hover:text-white px-2 sm:px-4"
               >
                 <Zap className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />

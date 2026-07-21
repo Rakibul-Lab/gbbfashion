@@ -72,6 +72,14 @@ const emptyForm = {
   subcategories: [] as AdminSubCategory[],
 }
 
+const CATEGORIES_UPDATED_EVENT = 'gbb:categories-updated'
+
+function notifyCategoriesUpdated() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(CATEGORIES_UPDATED_EVENT))
+  }
+}
+
 export function AdminCategoriesPage() {
   const [categories, setCategories] = useState<AdminCategory[]>([])
   const [loading, setLoading] = useState(true)
@@ -157,6 +165,7 @@ export function AdminCategoriesPage() {
       toast.success(editing ? 'Category updated' : 'Category created')
       setDialogOpen(false)
       await load()
+      notifyCategoriesUpdated()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Save failed')
     } finally {
@@ -171,6 +180,7 @@ export function AdminCategoriesPage() {
       if (!res.ok) throw new Error()
       toast.success('Category deleted')
       await load()
+      notifyCategoriesUpdated()
     } catch {
       toast.error('Delete failed')
     }
@@ -184,6 +194,7 @@ export function AdminCategoriesPage() {
       if (!res.ok) throw new Error(data.error || 'Seed failed')
       toast.success(data.message || 'Categories seeded')
       await load()
+      notifyCategoriesUpdated()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Seed failed')
     } finally {

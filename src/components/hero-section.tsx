@@ -10,6 +10,7 @@ import {
   DEFAULT_HERO_MEDIA_URL,
   type HeroMediaType,
 } from '@/lib/site-settings-client'
+import { collectFrontProductImages } from '@/lib/section-media'
 
 export function HeroSection() {
   const [mediaType, setMediaType] = useState<HeroMediaType>(DEFAULT_HERO_MEDIA_TYPE)
@@ -21,27 +22,58 @@ export function HeroSection() {
   useEffect(() => {
     let cancelled = false
 
-    const load = () => {
-      fetch('/api/settings', { cache: 'no-store' })
-        .then((res) => res.json())
-        .then((data) => {
-          if (cancelled || !data) return
-          setMediaType(data.heroMediaType === 'video' ? 'video' : 'image')
-          setMediaUrl(
-            typeof data.heroMediaUrl === 'string' ? data.heroMediaUrl : DEFAULT_HERO_MEDIA_URL
-          )
-        })
-        .catch(() => undefined)
+    const load = async () => {
+      try {
+        const [settingsRes, productsRes] = await Promise.all([
+          fetch('/api/settings', { cache: 'no-store' }),
+          fetch('/api/products', { cache: 'no-store' }),
+        ])
+        const data = settingsRes.ok ? await settingsRes.json() : null
+        const products = productsRes.ok ? await productsRes.json() : []
+        if (cancelled) return
+
+        const configuredType = data?.heroMediaType === 'video' ? 'video' : 'image'
+        const configuredUrl =
+          typeof data?.heroMediaUrl === 'string' ? data.heroMediaUrl.trim() : DEFAULT_HERO_MEDIA_URL
+
+        if (configuredUrl) {
+          setMediaType(configuredType)
+          setMediaUrl(configuredUrl)
+          return
+        }
+
+        const featured = Array.isArray(products) ? collectFrontProductImages(products) : []
+        setMediaType('image')
+        setMediaUrl(featured[0] || DEFAULT_HERO_MEDIA_URL)
+      } catch {
+        // keep defaults
+      }
     }
 
-    load()
+    void load()
 
     const onUpdated = (event: Event) => {
       const detail = (event as CustomEvent<{ heroMediaType?: HeroMediaType; heroMediaUrl?: string }>)
         .detail
       if (!detail) return
       if (detail.heroMediaType) setMediaType(detail.heroMediaType)
-      if (detail.heroMediaUrl !== undefined) setMediaUrl(detail.heroMediaUrl)
+      if (detail.heroMediaUrl !== undefined) {
+        const next = detail.heroMediaUrl.trim()
+        if (next) {
+          setMediaUrl(next)
+          return
+        }
+        // Cleared hero — fall back to featured product image
+        void fetch('/api/products', { cache: 'no-store' })
+          .then((res) => (res.ok ? res.json() : []))
+          .then((products) => {
+            if (cancelled) return
+            const featured = Array.isArray(products) ? collectFrontProductImages(products) : []
+            setMediaType('image')
+            setMediaUrl(featured[0] || '')
+          })
+          .catch(() => undefined)
+      }
     }
 
     window.addEventListener('site-settings-updated', onUpdated as EventListener)

@@ -2,7 +2,42 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+function Input({
+  className,
+  type,
+  onWheel,
+  ref,
+  ...props
+}: React.ComponentProps<"input">) {
+  const localRef = React.useRef<HTMLInputElement | null>(null)
+
+  const setRefs = React.useCallback(
+    (node: HTMLInputElement | null) => {
+      localRef.current = node
+      if (typeof ref === "function") {
+        ref(node)
+      } else if (ref) {
+        ref.current = node
+      }
+    },
+    [ref]
+  )
+
+  // Browsers change <input type="number"> on mouse wheel while focused —
+  // block that so scrolling the page does not alter qty / stock values.
+  React.useEffect(() => {
+    if (type !== "number") return
+    const el = localRef.current
+    if (!el) return
+    const handleWheel = (event: WheelEvent) => {
+      if (document.activeElement === el) {
+        event.preventDefault()
+      }
+    }
+    el.addEventListener("wheel", handleWheel, { passive: false })
+    return () => el.removeEventListener("wheel", handleWheel)
+  }, [type])
+
   return (
     <input
       type={type}
@@ -13,6 +48,8 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
         "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
         className
       )}
+      ref={setRefs}
+      onWheel={onWheel}
       {...props}
     />
   )

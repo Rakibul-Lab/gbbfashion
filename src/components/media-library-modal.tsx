@@ -214,9 +214,11 @@ export function MediaLibraryModal({
   }
 
   const onFileInput = (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    e.target.value = ''
-    if (files?.length) void uploadFiles(files)
+    const input = e.target
+    // FileList is live — copy before clearing the input or the list becomes empty
+    const list = input.files?.length ? Array.from(input.files) : []
+    input.value = ''
+    if (list.length) void uploadFiles(list)
   }
 
   const onDrop = (e: DragEvent) => {

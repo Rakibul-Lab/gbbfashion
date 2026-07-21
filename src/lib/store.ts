@@ -72,7 +72,7 @@ function loadUserCart(userId: string): CartItem[] {
 function mergeCarts(base: CartItem[], incoming: CartItem[]): CartItem[] {
   const map = new Map<string, CartItem>()
   for (const item of [...base, ...incoming]) {
-    const key = cartLineKey(item.productId, item.color)
+    const key = cartLineKey(item.productId, item.color, item.size)
     const existing = map.get(key)
     if (existing) {
       map.set(key, {
@@ -80,6 +80,7 @@ function mergeCarts(base: CartItem[], incoming: CartItem[]): CartItem[] {
         quantity: existing.quantity + item.quantity,
         image: item.image || existing.image,
         colorSwatch: item.colorSwatch ?? existing.colorSwatch,
+        size: item.size ?? existing.size,
       })
     } else {
       map.set(key, { ...item })
@@ -103,9 +104,11 @@ export interface CartItem {
   price: number
   image: string
   quantity: number
-  /** Selected color name (unique cart line per color) */
+  /** Selected color name (unique cart line per color + size) */
   color?: string | null
   colorSwatch?: string | null
+  /** Selected size label when the color has sizes */
+  size?: string | null
 }
 
 export type ProductTab = 'new' | 'prime'
@@ -140,8 +143,17 @@ interface StoreState {
   setAccountTab: (tab: AccountTab, options?: { syncUrl?: boolean }) => void
   selectProduct: (productId: string | null) => void
   addToCart: (item: Omit<CartItem, 'quantity'>, quantity?: number) => void
-  removeFromCart: (productId: string, color?: string | null) => void
-  updateQuantity: (productId: string, quantity: number, color?: string | null) => void
+  removeFromCart: (
+    productId: string,
+    color?: string | null,
+    size?: string | null
+  ) => void
+  updateQuantity: (
+    productId: string,
+    quantity: number,
+    color?: string | null,
+    size?: string | null
+  ) => void
   clearCart: () => void
   setOrderId: (orderId: string | null) => void
   setCategoryFilter: (category: string) => void
@@ -183,8 +195,11 @@ function pushViewUrl(
 ) {
   // Let Next.js own shop/product deep links when already on those paths
   if (typeof window !== 'undefined') {
-    if (state.view === 'shop' && window.location.pathname.startsWith('/collections')) return
-    if (state.view === 'product' && window.location.pathname.startsWith('/products/')) return
+    const path = window.location.pathname
+    if (state.view === 'shop' && path.startsWith('/collections')) return
+    if (state.view === 'product' && path.startsWith('/products/')) return
+    // Stay on /admin?page=… while remaining in admin (don't strip the query)
+    if (state.view === 'admin' && path.startsWith('/admin')) return
   }
   const path = buildViewPath(state.view, {
     productId: state.selectedProductId,
@@ -214,6 +229,14 @@ export const useStore = create<StoreState>()(
 
       setView: (view, options) => {
         const syncUrl = options?.syncUrl !== false
+        if (get().view === view) {
+          if (!syncUrl || get()._skipNextUrlSync) {
+            if (get()._skipNextUrlSync) set({ _skipNextUrlSync: false })
+            return
+          }
+          pushViewUrl(get(), options?.replace ? 'replace' : 'push')
+          return
+        }
         set({ view })
         if (!syncUrl) return
         if (get()._skipNextUrlSync) {
@@ -238,18 +261,19 @@ export const useStore = create<StoreState>()(
         const qty = Math.max(1, Math.floor(quantity) || 1)
         const userId = get().user?.id
         const { cart } = get()
-        const key = cartLineKey(item.productId, item.color)
+        const key = cartLineKey(item.productId, item.color, item.size)
         const existing = cart.find(
-          (c) => cartLineKey(c.productId, c.color) === key
+          (c) => cartLineKey(c.productId, c.color, c.size) === key
         )
         const nextCart = existing
           ? cart.map((c) =>
-              cartLineKey(c.productId, c.color) === key
+              cartLineKey(c.productId, c.color, c.size) === key
                 ? {
                     ...c,
                     quantity: c.quantity + qty,
                     image: item.image || c.image,
                     colorSwatch: item.colorSwatch ?? c.colorSwatch,
+                    size: item.size ?? c.size,
                   }
                 : c
             )
@@ -258,34 +282,40 @@ export const useStore = create<StoreState>()(
         set({ cart: nextCart })
         syncActiveUserCart(userId, nextCart)
 
+        const variantParts = [
+          item.color && item.color !== 'Default' ? item.color : null,
+          item.size || null,
+        ].filter(Boolean)
+
         trackAddToCart({
           item_id: item.productId,
           item_name: item.name,
-          item_variant:
-            item.color && item.color !== 'Default' ? item.color : undefined,
+          item_variant: variantParts.length ? variantParts.join(' / ') : undefined,
           price: item.price,
           quantity: qty,
         })
       },
 
-      removeFromCart: (productId, color) => {
+      removeFromCart: (productId, color, size) => {
         const userId = get().user?.id
-        const key = cartLineKey(productId, color)
+        const key = cartLineKey(productId, color, size)
         const nextCart = get().cart.filter(
-          (c) => cartLineKey(c.productId, c.color) !== key
+          (c) => cartLineKey(c.productId, c.color, c.size) !== key
         )
         set({ cart: nextCart })
         syncActiveUserCart(userId, nextCart)
       },
 
-      updateQuantity: (productId, quantity, color) => {
+      updateQuantity: (productId, quantity, color, size) => {
         const userId = get().user?.id
-        const key = cartLineKey(productId, color)
+        const key = cartLineKey(productId, color, size)
         const nextCart =
           quantity <= 0
-            ? get().cart.filter((c) => cartLineKey(c.productId, c.color) !== key)
+            ? get().cart.filter(
+                (c) => cartLineKey(c.productId, c.color, c.size) !== key
+              )
             : get().cart.map((c) =>
-                cartLineKey(c.productId, c.color) === key
+                cartLineKey(c.productId, c.color, c.size) === key
                   ? { ...c, quantity }
                   : c
               )
@@ -356,15 +386,27 @@ export const useStore = create<StoreState>()(
       },
 
       applyRouteState: (route) => {
+        const prev = get()
+        const nextProductId =
+          route.productId !== undefined ? route.productId : prev.selectedProductId
+        const nextAccountTab = route.accountTab ?? prev.accountTab
+        const nextOrderId =
+          route.orderId !== undefined ? route.orderId : prev.orderId
+
+        if (
+          prev.view === route.view &&
+          prev.selectedProductId === nextProductId &&
+          prev.accountTab === nextAccountTab &&
+          prev.orderId === nextOrderId
+        ) {
+          return
+        }
+
         set({
           view: route.view,
-          selectedProductId:
-            route.productId !== undefined
-              ? route.productId
-              : get().selectedProductId,
-          accountTab: route.accountTab ?? get().accountTab,
-          orderId:
-            route.orderId !== undefined ? route.orderId : get().orderId,
+          selectedProductId: nextProductId,
+          accountTab: nextAccountTab,
+          orderId: nextOrderId,
           _skipNextUrlSync: true,
         })
       },
@@ -377,16 +419,26 @@ export const useStore = create<StoreState>()(
         const currentCart = get().cart
 
         // Persist outgoing user's cart, then clear session cart on logout
-        if (prev?.id) {
+        if (prev?.id && (!user || prev.id !== user.id)) {
           syncActiveUserCart(prev.id, currentCart)
         }
 
         if (!user) {
-          set({ user: null, cart: [] })
+          if (prev) set({ user: null, cart: [] })
           return
         }
 
-        // Same user (session rehydrate) — keep in-memory cart if present
+        // Same user (session rehydrate) — avoid redundant setState loops
+        if (
+          prev?.id === user.id &&
+          prev.name === user.name &&
+          prev.email === user.email &&
+          prev.role === user.role
+        ) {
+          return
+        }
+
+        // Same id but profile fields changed
         if (prev?.id === user.id) {
           set({ user })
           if (currentCart.length > 0) {
