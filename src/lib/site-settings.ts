@@ -27,10 +27,13 @@ import {
   normalizeWhatsAppIconUrl,
   normalizeSocialUrl,
   normalizePromoBanners,
+  normalizeBagTheVibeContent,
+  DEFAULT_BAG_THE_VIBE,
   type HeroMediaType,
   type HomepageSectionConfig,
   type PromoBannerConfig,
   type WhatsAppIconId,
+  type BagTheVibeContent,
 } from '@/lib/site-settings-client'
 import {
   DEFAULT_INVOICE_EMAIL,
@@ -72,6 +75,8 @@ export {
   normalizeWhatsAppIconUrl,
   normalizeSocialUrl,
   normalizePromoBanners,
+  normalizeBagTheVibeContent,
+  DEFAULT_BAG_THE_VIBE,
   whatsappChatUrl,
   MAX_LOGO_DIM,
   MIN_LOGO_DIM,
@@ -80,6 +85,7 @@ export {
   type HomepageSectionConfig,
   type PromoBannerConfig,
   type WhatsAppIconId,
+  type BagTheVibeContent,
 } from '@/lib/site-settings-client'
 
 export {
@@ -124,6 +130,7 @@ export type SiteSettings = {
   promoBanners: PromoBannerConfig[]
   homepageSections: HomepageSectionConfig[]
   sectionMedia: SectionMediaMap
+  bagTheVibe: BagTheVibeContent
   invoiceEmail: InvoiceEmailSettings
   maintenance: MaintenanceSettings
   updatedAt?: string
@@ -208,6 +215,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
           ? (parsed.sectionMedia as SectionMediaMap)
           : null
       ),
+      bagTheVibe: normalizeBagTheVibeContent(parsed.bagTheVibe),
       invoiceEmail: normalizeInvoiceEmailSettings(parsed.invoiceEmail),
       maintenance: normalizeMaintenanceSettings(parsed.maintenance),
       updatedAt: parsed.updatedAt,
@@ -232,6 +240,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
       promoBanners: normalizePromoBanners(null),
       homepageSections: mergeHomepageSections(null),
       sectionMedia: mergeSectionMedia(null),
+      bagTheVibe: DEFAULT_BAG_THE_VIBE,
       invoiceEmail: DEFAULT_INVOICE_EMAIL,
       maintenance: DEFAULT_MAINTENANCE,
     }
@@ -298,6 +307,9 @@ export async function saveSiteSettings(patch: Partial<SiteSettings>): Promise<Si
       patch.homepageSections ?? current.homepageSections
     ),
     sectionMedia: mergeSectionMedia(patch.sectionMedia ?? current.sectionMedia),
+    bagTheVibe: normalizeBagTheVibeContent(
+      patch.bagTheVibe ?? current.bagTheVibe
+    ),
     invoiceEmail: normalizeInvoiceEmailSettings(
       patch.invoiceEmail ?? current.invoiceEmail
     ),

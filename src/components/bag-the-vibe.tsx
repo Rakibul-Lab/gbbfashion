@@ -1,22 +1,61 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import { useEffect, useState } from 'react'
 import { useStore } from '@/lib/store'
 import { useCurrency } from '@/hooks/use-currency'
 import { useSectionMedia } from '@/hooks/use-section-media'
 import { SectionMediaFill } from '@/components/section-media'
 import { productImageContainerClass } from '@/lib/product-image'
 import { ArrowRight } from 'lucide-react'
+import {
+  DEFAULT_BAG_THE_VIBE,
+  normalizeBagTheVibeContent,
+  type BagTheVibeContent,
+} from '@/lib/site-settings-client'
 
 export function BagTheVibe() {
   const { setView, selectProduct } = useStore()
   const { format } = useCurrency()
   const { get } = useSectionMedia()
+  const [content, setContent] = useState<BagTheVibeContent>(DEFAULT_BAG_THE_VIBE)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/settings', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return
+        setContent(normalizeBagTheVibeContent(data?.bagTheVibe))
+      })
+      .catch(() => {})
+
+    const onUpdated = (event: Event) => {
+      const detail = (event as CustomEvent).detail as
+        | { bagTheVibe?: unknown }
+        | null
+        | undefined
+      if (detail && typeof detail === 'object' && 'bagTheVibe' in detail) {
+        setContent(normalizeBagTheVibeContent(detail.bagTheVibe))
+      }
+    }
+    window.addEventListener('site-settings-updated', onUpdated as EventListener)
+    return () => {
+      cancelled = true
+      window.removeEventListener(
+        'site-settings-updated',
+        onUpdated as EventListener
+      )
+    }
+  }, [])
 
   const handleViewProduct = () => {
-    selectProduct('butterfly-design-shoulder-bag')
+    selectProduct(content.productSlug || DEFAULT_BAG_THE_VIBE.productSlug)
     setView('product')
   }
+
+  const showCompare =
+    content.originalPrice != null && content.originalPrice > content.price
 
   return (
     <section className="w-full py-16 md:py-24 bg-white">
@@ -51,7 +90,7 @@ export function BagTheVibe() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
               <p className="text-white/90 text-sm md:text-base tracking-wider uppercase font-medium">
-                Style that speaks before you do
+                {content.lifestyleTagline}
               </p>
             </div>
           </motion.div>
@@ -64,7 +103,7 @@ export function BagTheVibe() {
             className="flex flex-col items-center justify-center bg-slate-50 rounded-sm p-6 md:p-10 group"
           >
             <span className="inline-block bg-black text-white text-[10px] md:text-xs font-bold tracking-widest uppercase px-4 py-1.5 mb-6">
-              TRENDING
+              {content.badge}
             </span>
 
             <div
@@ -72,22 +111,24 @@ export function BagTheVibe() {
             >
               <SectionMediaFill
                 media={get('bag_the_vibe_product')}
-                alt="Butterfly Design Shoulder Bag"
+                alt={content.title}
                 fit="fill"
               />
             </div>
 
             <h3 className="text-base md:text-lg font-semibold text-slate-900 text-center mb-2">
-              Butterfly Design Shoulder Bag
+              {content.title}
             </h3>
 
             <div className="flex items-center gap-3 mb-6">
               <span className="text-xl md:text-2xl font-bold text-slate-900">
-                {format(1025)}
+                {format(content.price)}
               </span>
-              <span className="text-sm md:text-base text-slate-400 line-through">
-                {format(2562)}
-              </span>
+              {showCompare ? (
+                <span className="text-sm md:text-base text-slate-400 line-through">
+                  {format(content.originalPrice!)}
+                </span>
+              ) : null}
             </div>
 
             <button

@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select'
 import { MediaPickerButton } from '@/components/media-picker-button'
 import { broadcastSectionMedia } from '@/hooks/use-section-media'
+import { Input } from '@/components/ui/input'
 import {
   mergeSectionMedia,
   sectionMediaGroups,
@@ -21,13 +22,21 @@ import {
   type SectionMediaSlot,
   type SectionMediaType,
 } from '@/lib/section-media'
+import type { BagTheVibeContent } from '@/lib/site-settings-client'
 
 type Props = {
   media: SectionMediaMap
   onChange: (next: SectionMediaMap) => void
+  bagTheVibe: BagTheVibeContent
+  onBagTheVibeChange: (next: BagTheVibeContent) => void
 }
 
-export function AdminSectionMediaManager({ media, onChange }: Props) {
+export function AdminSectionMediaManager({
+  media,
+  onChange,
+  bagTheVibe,
+  onBagTheVibeChange,
+}: Props) {
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [clearingKey, setClearingKey] = useState<string | null>(null)
   const [draftTypes, setDraftTypes] = useState<Record<string, SectionMediaType>>({})
@@ -95,6 +104,102 @@ export function AdminSectionMediaManager({ media, onChange }: Props) {
           <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
             {group}
           </h3>
+
+          {group === 'Bag The Vibe' && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  Product card details
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Update title, prices, badge, and product link shown on the homepage Bag The
+                  Vibe section. Click Save content at the top when done.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs">Product title</Label>
+                  <Input
+                    value={bagTheVibe.title}
+                    onChange={(e) =>
+                      onBagTheVibeChange({ ...bagTheVibe, title: e.target.value })
+                    }
+                    placeholder="Butterfly Design Shoulder Bag"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Badge</Label>
+                  <Input
+                    value={bagTheVibe.badge}
+                    onChange={(e) =>
+                      onBagTheVibeChange({ ...bagTheVibe, badge: e.target.value })
+                    }
+                    placeholder="TRENDING"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Product slug / ID</Label>
+                  <Input
+                    value={bagTheVibe.productSlug}
+                    onChange={(e) =>
+                      onBagTheVibeChange({
+                        ...bagTheVibe,
+                        productSlug: e.target.value,
+                      })
+                    }
+                    placeholder="butterfly-design-shoulder-bag"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Price</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={bagTheVibe.price}
+                    onChange={(e) =>
+                      onBagTheVibeChange({
+                        ...bagTheVibe,
+                        price: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Compare-at price (optional)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={bagTheVibe.originalPrice ?? ''}
+                    onChange={(e) =>
+                      onBagTheVibeChange({
+                        ...bagTheVibe,
+                        originalPrice: e.target.value
+                          ? Number(e.target.value)
+                          : null,
+                      })
+                    }
+                    placeholder="Leave empty for no strike-through"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs">Lifestyle tagline</Label>
+                  <Input
+                    value={bagTheVibe.lifestyleTagline}
+                    onChange={(e) =>
+                      onBagTheVibeChange({
+                        ...bagTheVibe,
+                        lifestyleTagline: e.target.value,
+                      })
+                    }
+                    placeholder="Style that speaks before you do"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {slots.map((def) => {
               const slot = media[def.key] || {

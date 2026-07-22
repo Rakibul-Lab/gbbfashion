@@ -21,10 +21,13 @@ import { MediaPickerButton } from '@/components/media-picker-button'
 import { broadcastSectionMedia } from '@/hooks/use-section-media'
 import {
   DEFAULT_ANNOUNCEMENTS,
+  DEFAULT_BAG_THE_VIBE,
   DEFAULT_HOMEPAGE_SECTIONS,
   DEFAULT_PROMO_BANNERS,
   mergeHomepageSections,
+  normalizeBagTheVibeContent,
   normalizePromoBanners,
+  type BagTheVibeContent,
   type HomepageSectionConfig,
   type PromoBannerConfig,
 } from '@/lib/site-settings-client'
@@ -48,6 +51,8 @@ export function AdminContentPage() {
   const [sectionMedia, setSectionMedia] = useState<SectionMediaMap>(() =>
     defaultSectionMedia()
   )
+  const [bagTheVibe, setBagTheVibe] =
+    useState<BagTheVibeContent>(DEFAULT_BAG_THE_VIBE)
   const [uploadingPromoIndex, setUploadingPromoIndex] = useState<number | null>(null)
 
   const load = useCallback(async () => {
@@ -65,6 +70,7 @@ export function AdminContentPage() {
         setHomepageSections(mergeHomepageSections(null))
       }
       setSectionMedia(mergeSectionMedia(data.sectionMedia))
+      setBagTheVibe(normalizeBagTheVibeContent(data.bagTheVibe))
     } catch {
       toast.error('Failed to load content settings')
     } finally {
@@ -92,11 +98,13 @@ export function AdminContentPage() {
           promoBanners,
           homepageSections,
           sectionMedia,
+          bagTheVibe,
         }),
       })
       if (!res.ok) throw new Error()
       const data = await res.json()
       setSectionMedia(mergeSectionMedia(data.sectionMedia))
+      setBagTheVibe(normalizeBagTheVibeContent(data.bagTheVibe))
       broadcastSectionMedia(mergeSectionMedia(data.sectionMedia))
       window.dispatchEvent(new CustomEvent('site-settings-updated', { detail: data }))
       toast.success('Storefront content saved')
@@ -418,7 +426,12 @@ export function AdminContentPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <AdminSectionMediaManager media={sectionMedia} onChange={setSectionMedia} />
+          <AdminSectionMediaManager
+            media={sectionMedia}
+            onChange={setSectionMedia}
+            bagTheVibe={bagTheVibe}
+            onBagTheVibeChange={setBagTheVibe}
+          />
         </CardContent>
       </Card>
 

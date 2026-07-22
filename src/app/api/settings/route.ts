@@ -11,6 +11,7 @@ import {
 import { mergeSectionMedia } from '@/lib/section-media'
 import { normalizeInvoiceEmailSettings, type InvoiceEmailSettings } from '@/lib/invoice-email-settings'
 import { normalizeMaintenanceSettings, type MaintenanceSettings } from '@/lib/maintenance-settings'
+import { normalizeBagTheVibeContent } from '@/lib/site-settings-client'
 
 export async function GET() {
   try {
@@ -84,6 +85,9 @@ export async function PUT(request: NextRequest) {
     }
     if (body.sectionMedia && typeof body.sectionMedia === 'object') {
       patch.sectionMedia = mergeSectionMedia(body.sectionMedia as SectionMediaMap)
+    }
+    if (body.bagTheVibe && typeof body.bagTheVibe === 'object') {
+      patch.bagTheVibe = normalizeBagTheVibeContent(body.bagTheVibe)
     }
     if (body.invoiceEmail && typeof body.invoiceEmail === 'object') {
       patch.invoiceEmail = normalizeInvoiceEmailSettings(

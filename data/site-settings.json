@@ -136,7 +136,7 @@
     },
     "bag_the_vibe_product": {
       "type": "image",
-      "url": ""
+      "url": "/uploads/reels/color-1784102761995.jpg"
     },
     "luxe_leather": {
       "type": "image",
@@ -211,6 +211,14 @@
       "url": ""
     }
   },
+  "bagTheVibe": {
+    "badge": "TRENDING",
+    "title": "Butterfly Design Shoulder Bag",
+    "price": 1200,
+    "originalPrice": 1500,
+    "productSlug": "men-long-wallet",
+    "lifestyleTagline": "Style that speaks before you do"
+  },
   "invoiceEmail": {
     "templateId": "classic",
     "subject": "Your GBB Fashion invoice {{orderId}}",
@@ -225,5 +233,5 @@
     "message": "GBB Fashion is undergoing scheduled maintenance to improve your shopping experience. Thank you for your patience.",
     "eta": ""
   },
-  "updatedAt": "2026-07-22T05:53:18.691Z"
+  "updatedAt": "2026-07-22T10:14:38.265Z"
 }

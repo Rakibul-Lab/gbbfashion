@@ -172,6 +172,60 @@ export type SiteContentSettings = {
   homepageSections: HomepageSectionConfig[]
 }
 
+/** Editable Bag The Vibe promo card (Website → section media group). */
+export type BagTheVibeContent = {
+  badge: string
+  title: string
+  price: number
+  originalPrice: number | null
+  productSlug: string
+  lifestyleTagline: string
+}
+
+export const DEFAULT_BAG_THE_VIBE: BagTheVibeContent = {
+  badge: 'TRENDING',
+  title: 'Butterfly Design Shoulder Bag',
+  price: 1025,
+  originalPrice: 2562,
+  productSlug: 'butterfly-design-shoulder-bag',
+  lifestyleTagline: 'Style that speaks before you do',
+}
+
+export function normalizeBagTheVibeContent(value: unknown): BagTheVibeContent {
+  const raw =
+    value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  const price = Number(raw.price)
+  const originalRaw = raw.originalPrice
+  const originalPrice =
+    originalRaw === null || originalRaw === '' || originalRaw === undefined
+      ? null
+      : Number(originalRaw)
+
+  return {
+    badge:
+      typeof raw.badge === 'string' && raw.badge.trim()
+        ? raw.badge.trim()
+        : DEFAULT_BAG_THE_VIBE.badge,
+    title:
+      typeof raw.title === 'string' && raw.title.trim()
+        ? raw.title.trim()
+        : DEFAULT_BAG_THE_VIBE.title,
+    price: Number.isFinite(price) && price >= 0 ? Math.round(price * 100) / 100 : DEFAULT_BAG_THE_VIBE.price,
+    originalPrice:
+      originalPrice != null && Number.isFinite(originalPrice) && originalPrice >= 0
+        ? Math.round(originalPrice * 100) / 100
+        : null,
+    productSlug:
+      typeof raw.productSlug === 'string' && raw.productSlug.trim()
+        ? raw.productSlug.trim()
+        : DEFAULT_BAG_THE_VIBE.productSlug,
+    lifestyleTagline:
+      typeof raw.lifestyleTagline === 'string' && raw.lifestyleTagline.trim()
+        ? raw.lifestyleTagline.trim()
+        : DEFAULT_BAG_THE_VIBE.lifestyleTagline,
+  }
+}
+
 export const DEFAULT_CURRENCY_CODE = 'BDT'
 
 /** WhatsApp number with country code, digits only preferred (e.g. 8801335107218) */
