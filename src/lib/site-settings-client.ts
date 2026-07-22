@@ -27,6 +27,8 @@ export type PromoBannerConfig = {
 export type HomepageSectionKey =
   | 'hero'
   | 'featuredCollections'
+  | 'primeBags'
+  | 'primeShoes'
   | 'promoBanners'
   | 'newInTrend'
   | 'newArrivals'
@@ -111,7 +113,8 @@ export function normalizePromoBanners(
 
 export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionConfig[] = [
   { key: 'hero', label: 'Hero banner', enabled: true },
-  { key: 'featuredCollections', label: 'Featured Collections', enabled: true },
+  { key: 'primeBags', label: 'Prime Bags', enabled: true },
+  { key: 'primeShoes', label: 'Prime Shoes', enabled: true },
   { key: 'promoBanners', label: 'Promo Banners', enabled: true },
   { key: 'newInTrend', label: 'New In Trend', enabled: true },
   { key: 'newArrivals', label: 'New Arrivals', enabled: true },
@@ -129,6 +132,26 @@ export function mergeHomepageSections(
   saved?: HomepageSectionConfig[] | null
 ): HomepageSectionConfig[] {
   const byKey = new Map((saved || []).map((s) => [s.key, s]))
+
+  // Migrate legacy combined "Featured Collections" toggle → Prime Bags / Shoes
+  const legacy = byKey.get('featuredCollections')
+  if (legacy) {
+    if (!byKey.has('primeBags')) {
+      byKey.set('primeBags', {
+        key: 'primeBags',
+        label: 'Prime Bags',
+        enabled: legacy.enabled !== false,
+      })
+    }
+    if (!byKey.has('primeShoes')) {
+      byKey.set('primeShoes', {
+        key: 'primeShoes',
+        label: 'Prime Shoes',
+        enabled: legacy.enabled !== false,
+      })
+    }
+  }
+
   return DEFAULT_HOMEPAGE_SECTIONS.map((def) => {
     const existing = byKey.get(def.key)
     return existing ? { ...def, enabled: existing.enabled, label: def.label } : def

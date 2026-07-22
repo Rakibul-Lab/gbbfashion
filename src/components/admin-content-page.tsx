@@ -191,26 +191,30 @@ export function AdminContentPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Website content</h2>
-          <p className="text-slate-500 text-sm mt-1">
-            Manage announcements, promo copy, section visibility, and all homepage & shop media
-            (image or video).
-          </p>
+      <div className="sticky top-14 lg:top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 sm:py-4 mb-2 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/90 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.35)]">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+              Website content
+            </h2>
+            <p className="text-slate-500 text-sm mt-1">
+              Manage announcements, promo copy, section visibility, and all homepage & shop media
+              (image or video).
+            </p>
+          </div>
+          <Button
+            className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white shrink-0 shadow-sm"
+            disabled={saving}
+            onClick={() => void handleSave()}
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Save content
+          </Button>
         </div>
-        <Button
-          className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white"
-          disabled={saving}
-          onClick={() => void handleSave()}
-        >
-          {saving ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4 mr-2" />
-          )}
-          Save content
-        </Button>
       </div>
 
       <Card className="rounded-xl border-slate-200">
@@ -427,9 +431,10 @@ export function AdminContentPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-slate-500 mb-2">
-            Toggle every homepage block. Stories / Reels pull from the Reels admin. Tote /
-            Backpack pulls products by subcategory (tote-bag / bag-pack). New Arrivals / Prime
-            Drop products come from product flags.
+            Toggle every homepage block. Prime Bags / Prime Shoes can be shown independently.
+            Stories / Reels pull from the Reels admin. Tote / Backpack pulls products by
+            subcategory (tote-bag / bag-pack). New Arrivals / Prime Drop products come from
+            product flags.
           </p>
           {homepageSections.map((section, index) => (
             <div

@@ -116,11 +116,17 @@ function ProgressiveHome() {
 
   const show = (key: string) => enabled[key] !== false
   const showTrendSection = show('newInTrend') || show('newArrivals')
+  const showPrimeSection = show('primeBags') || show('primeShoes')
 
   return (
     <>
       {show('hero') && <HeroSection />}
-      {visibleSections >= 2 && show('featuredCollections') && <FeaturedCollections />}
+      {visibleSections >= 2 && showPrimeSection && (
+        <FeaturedCollections
+          showBags={show('primeBags')}
+          showShoes={show('primeShoes')}
+        />
+      )}
       {visibleSections >= 3 && show('promoBanners') && <PromoBanners />}
       {visibleSections >= 4 && showTrendSection && (
         <NewInTrend

@@ -113,11 +113,11 @@ model Order {
   state           String
   zipCode         String
   totalAmount     Float
-  /** Order fulfillment: pending | processing | shipped | delivered | cancelled */
+  /** Order fulfillment: pending | processing | shipped | delivered | cancelled | returning | exchanging | returned | exchanged */
   status          String      @default("pending")
   /** Payment channel: cod | sslcommerz */
   paymentMethod   String      @default("cod")
-  /** unpaid | pending | paid | failed | cancelled */
+  /** unpaid | pending | paid | failed | cancelled | refunded | partial_refund */
   paymentStatus   String      @default("unpaid")
   /** SSLCommerz tran_id (usually same as order id) */
   transactionId   String?
@@ -128,6 +128,7 @@ model Order {
   /** JSON snapshot of gateway validation / IPN payload (sanitized summary) */
   paymentMeta     String?     @db.Text
   items           OrderItem[]
+  returns         OrderReturn[]
   user            User?       @relation(fields: [userId], references: [id])
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -147,6 +148,53 @@ model OrderItem {
   price       Float
   order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+}
+
+/**
+ * Admin-managed return or exchange for a delivered order.
+ * type: return | exchange
+ * status: pending | completed | cancelled
+ */
+model OrderReturn {
+  id           String            @id @default(cuid())
+  orderId      String
+  type         String
+  status       String            @default("completed")
+  reason       String?           @db.Text
+  notes        String?           @db.Text
+  /** Amount refunded to customer (return) or price difference adjustment */
+  refundAmount Float             @default(0)
+  /** Whether returned units were added back to inventory */
+  restocked    Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  order        Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items        OrderReturnItem[]
+
+  @@index([orderId])
+  @@index([type])
+  @@index([status])
+}
+
+model OrderReturnItem {
+  id                   String      @id @default(cuid())
+  returnId             String
+  orderItemId          String
+  quantity             Int
+  productId            String?
+  /** Snapshot of returned line label */
+  productName          String
+  unitPrice            Float       @default(0)
+  /** Exchange only — unit price of the replacement color/size */
+  exchangeUnitPrice    Float?
+  /** Exchange only — replacement variant encoded like order lines */
+  exchangeProductName  String?
+  exchangeColor        String?
+  exchangeSize         String?
+  returnRecord         OrderReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  @@index([returnId])
+  @@index([orderItemId])
 }
 
 model Reel {

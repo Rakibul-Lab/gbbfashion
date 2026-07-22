@@ -101,10 +101,14 @@ import {
   CheckCircle2,
   FileSpreadsheet,
   Download,
+  ArrowLeftRight,
+  PackagePlus,
+  CalendarClock,
 } from 'lucide-react'
 import { OrderInvoiceDialog, type InvoiceOrder } from '@/components/order-invoice'
 import { OrderConfirmDialog } from '@/components/order-confirm-dialog'
 import { OrderCashReceivedDialog } from '@/components/order-cash-received-dialog'
+import { OrderReturnExchangeDialog } from '@/components/order-return-exchange-dialog'
 import { MediaLibraryModal, type MediaItem } from '@/components/media-library-modal'
 import { MediaPickerButton } from '@/components/media-picker-button'
 import { AdminCategoriesPage } from '@/components/admin-categories-page'
@@ -162,6 +166,11 @@ import {
   resolveOrderItemColor,
   resolveOrderItemSize,
 } from '@/lib/product-stock'
+import {
+  isReturnFinalStatus,
+  isReturnPendingStatus,
+  RETURN_RECORD_STATUS,
+} from '@/lib/order-returns'
 // Using simple CSS-based chart instead of recharts for performance
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -200,6 +209,30 @@ interface OrderItem {
   price: number
 }
 
+interface OrderReturnItem {
+  id: string
+  orderItemId: string
+  quantity: number
+  productName: string
+  unitPrice?: number
+  exchangeUnitPrice?: number | null
+  exchangeProductName?: string | null
+  exchangeColor?: string | null
+  exchangeSize?: string | null
+}
+
+interface OrderReturnRecord {
+  id: string
+  type: string
+  status: string
+  reason?: string | null
+  notes?: string | null
+  refundAmount: number
+  restocked?: boolean
+  createdAt: string
+  items: OrderReturnItem[]
+}
+
 interface Order {
   id: string
   customerName: string
@@ -218,7 +251,9 @@ interface Order {
   transactionId?: string | null
   paidAt?: string | null
   items: OrderItem[]
+  returns?: OrderReturnRecord[]
   createdAt: string
+  updatedAt?: string
 }
 
 interface Reel {
@@ -286,6 +321,10 @@ const statusColors: Record<string, string> = {
   processing: 'bg-teal-100 text-teal-700',
   shipped: 'bg-cyan-100 text-cyan-700',
   delivered: 'bg-emerald-100 text-emerald-700',
+  returning: 'bg-amber-100 text-amber-900',
+  exchanging: 'bg-orange-100 text-orange-900',
+  returned: 'bg-violet-100 text-violet-700',
+  exchanged: 'bg-orange-100 text-orange-800',
   cancelled: 'bg-red-100 text-red-700',
 }
 
@@ -509,6 +548,7 @@ export function AdminDashboard() {
     )
   )
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [liveClock, setLiveClock] = useState(() => new Date())
 
   const pageFromUrl = searchParams?.get('page') ?? ''
 
@@ -572,6 +612,7 @@ export function AdminDashboard() {
   const [invoiceOrder, setInvoiceOrder] = useState<InvoiceOrder | null>(null)
   const [confirmOrder, setConfirmOrder] = useState<Order | null>(null)
   const [cashReceivedOrder, setCashReceivedOrder] = useState<Order | null>(null)
+  const [returnExchangeOrder, setReturnExchangeOrder] = useState<Order | null>(null)
 
   // Delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -593,6 +634,10 @@ export function AdminDashboard() {
     try {
       const res = await fetch('/api/orders')
       const data = await res.json()
+      if (!res.ok || !Array.isArray(data)) {
+        console.error('Orders fetch failed', data)
+        return
+      }
       setOrders(data)
     } catch (error) {
       console.error(error)
@@ -645,6 +690,23 @@ export function AdminDashboard() {
     load()
   }, [fetchProducts, fetchOrders, fetchReels, fetchUsers, fetchCatalogCategories])
 
+  // Live refresh for overview "today" stats
+  useEffect(() => {
+    if (activePage !== 'overview') return
+    const tick = () => {
+      void fetchProducts()
+      void fetchOrders()
+    }
+    const interval = window.setInterval(tick, 1000)
+    return () => window.clearInterval(interval)
+  }, [activePage, fetchProducts, fetchOrders])
+
+  useEffect(() => {
+    if (activePage !== 'overview') return
+    const id = window.setInterval(() => setLiveClock(new Date()), 1000)
+    return () => window.clearInterval(id)
+  }, [activePage])
+
   useEffect(() => {
     const onUpdated = () => {
       void fetchCatalogCategories()
@@ -686,6 +748,29 @@ export function AdminDashboard() {
   const totalOrders = orders.length
   const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0)
   const totalUsers = users.length
+
+  const isSameLocalDay = (iso: string | undefined, now = new Date()) => {
+    if (!iso) return false
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return false
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    )
+  }
+
+  const todayProducts = products.filter((p) => isSameLocalDay(p.createdAt)).length
+  const todaysOrdersList = orders.filter((o) => isSameLocalDay(o.createdAt))
+  const todayOrders = todaysOrdersList.length
+  const todayRevenue = todaysOrdersList
+    .filter((o) => o.status !== 'cancelled')
+    .reduce((sum, o) => sum + o.totalAmount, 0)
+  const todayDelivered = orders.filter(
+    (o) =>
+      o.status === 'delivered' &&
+      (isSameLocalDay(o.updatedAt) || isSameLocalDay(o.createdAt))
+  ).length
 
   const revenueByCategory = categoryOptions.map((cat) => {
     const catProducts = products.filter((p) => p.category === cat.value)
@@ -1196,6 +1281,80 @@ export function AdminDashboard() {
     }
   }
 
+  const pendingReturnForOrder = (order: Order) =>
+    order.returns?.find((r) => r.status === RETURN_RECORD_STATUS.PENDING) || null
+
+  const handleConfirmReturn = async (order: Order) => {
+    const pending = pendingReturnForOrder(order)
+    if (!pending) {
+      toast.error('No pending return/exchange found')
+      return
+    }
+    setSavingOrderId(order.id)
+    try {
+      const res = await fetch(
+        `/api/orders/${order.id}/returns/${pending.id}/confirm`,
+        { method: 'POST' }
+      )
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === 'string' ? data.error : 'Failed to confirm'
+        )
+      }
+      toast.success(
+        pending.type === 'exchange'
+          ? 'Exchange confirmed — stock & order total updated'
+          : 'Return confirmed — stock updated'
+      )
+      if (data.order) {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === data.order.id ? { ...o, ...data.order } : o))
+        )
+      } else {
+        fetchOrders()
+      }
+      void fetchProducts()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to confirm')
+    } finally {
+      setSavingOrderId(null)
+    }
+  }
+
+  const handleCancelReturn = async (order: Order) => {
+    const pending = pendingReturnForOrder(order)
+    if (!pending) {
+      toast.error('No pending return/exchange found')
+      return
+    }
+    setSavingOrderId(order.id)
+    try {
+      const res = await fetch(
+        `/api/orders/${order.id}/returns/${pending.id}/cancel`,
+        { method: 'POST' }
+      )
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === 'string' ? data.error : 'Failed to cancel'
+        )
+      }
+      toast.success('Pending return/exchange cancelled')
+      if (data.order) {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === data.order.id ? { ...o, ...data.order } : o))
+        )
+      } else {
+        fetchOrders()
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to cancel')
+    } finally {
+      setSavingOrderId(null)
+    }
+  }
+
   const handleDeleteOrder = async (id: string) => {
     try {
       const res = await fetch(`/api/orders/${id}`, { method: 'DELETE' })
@@ -1700,6 +1859,22 @@ export function AdminDashboard() {
           if (cashReceivedOrder) void handleCashReceived(cashReceivedOrder.id)
         }}
       />
+      <OrderReturnExchangeDialog
+        open={!!returnExchangeOrder}
+        onOpenChange={(open) => {
+          if (!open) setReturnExchangeOrder(null)
+        }}
+        order={returnExchangeOrder}
+        products={products}
+        currencySymbol={currencySymbol}
+        onCompleted={(updated) => {
+          setOrders((prev) =>
+            prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o))
+          )
+          setReturnExchangeOrder(null)
+          void fetchProducts()
+        }}
+      />
 
       <OrderConfirmDialog
         open={!!confirmOrder}
@@ -2170,11 +2345,79 @@ export function AdminDashboard() {
       { label: 'Total Users', value: totalUsers, icon: Users, color: 'text-rose-600', bg: 'bg-rose-50' },
     ]
 
+    const todayStatCards = [
+      {
+        label: "Today's Products",
+        value: todayProducts,
+        icon: PackagePlus,
+        color: 'text-sky-700',
+        bg: 'bg-sky-50',
+      },
+      {
+        label: "Today's Orders",
+        value: todayOrders,
+        icon: ShoppingCart,
+        color: 'text-teal-700',
+        bg: 'bg-teal-50',
+      },
+      {
+        label: `Today's Revenue (${currencySymbol})`,
+        value: formatMoney(todayRevenue),
+        icon: DollarSign,
+        color: 'text-amber-700',
+        bg: 'bg-amber-50',
+      },
+      {
+        label: "Today's Delivered",
+        value: todayDelivered,
+        icon: Truck,
+        color: 'text-emerald-700',
+        bg: 'bg-emerald-50',
+      },
+    ]
+
     return (
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Dashboard Overview</h2>
-          <p className="text-slate-500 text-sm mt-1">Welcome back, {user?.name || 'Admin'}</p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+              Dashboard Overview
+            </h2>
+            <p className="text-slate-500 text-sm mt-1">
+              Welcome back, {user?.name || 'Admin'}
+            </p>
+          </div>
+          <div
+            className="inline-flex items-center gap-3 rounded-2xl border border-slate-800/10 bg-slate-950 px-3.5 py-2 shadow-[0_8px_24px_-12px_rgba(15,23,42,0.55)]"
+            title="Live dashboard clock"
+          >
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400/25 to-amber-600/10 ring-1 ring-amber-400/30">
+              <CalendarClock className="h-4 w-4 text-amber-300" />
+              <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
+              </span>
+            </div>
+            <div className="pr-0.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amber-300/90">
+                Live
+              </p>
+              <p className="mt-0.5 text-sm font-medium tabular-nums tracking-wide text-slate-100">
+                {liveClock.toLocaleDateString(undefined, {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+                <span className="mx-1.5 text-slate-500">·</span>
+                {liveClock.toLocaleTimeString(undefined, {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                })}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Stat cards */}
@@ -2201,6 +2444,48 @@ export function AdminDashboard() {
               </Card>
             </motion.div>
           ))}
+        </div>
+
+        {/* Today's live stats */}
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <p className="text-sm font-semibold text-slate-800 tracking-tight">Today</p>
+            <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              Live
+            </span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {todayStatCards.map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 + i * 0.08 }}
+              >
+                <Card className="rounded-xl border-slate-200 bg-gradient-to-br from-white to-slate-50/80">
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`h-10 w-10 rounded-lg ${stat.bg} flex items-center justify-center`}
+                      >
+                        <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500">{stat.label}</p>
+                        <p className="text-xl font-bold text-slate-900 tabular-nums">
+                          {stat.value}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
         </div>
 
         {/* Products by Category Chart */}
@@ -3579,7 +3864,18 @@ export function AdminDashboard() {
   // ─── Orders Page ───────────────────────────────────────────────────────────
 
   function OrdersPage() {
-    const statusFilters = ['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled']
+    const statusFilters = [
+      'all',
+      'pending',
+      'processing',
+      'shipped',
+      'delivered',
+      'returning',
+      'exchanging',
+      'returned',
+      'exchanged',
+      'cancelled',
+    ]
     const orderColSpan = 11
 
     return (
@@ -3753,6 +4049,9 @@ export function AdminDashboard() {
                     filteredOrders.map((order) => {
                       const variantSummary = summarizeOrderVariants(order.items)
                       const isPending = order.status === 'pending'
+                      const isRmaPending = isReturnPendingStatus(order.status)
+                      const isRmaFinal = isReturnFinalStatus(order.status)
+                      const pendingRma = pendingReturnForOrder(order)
                       return (
                       <Fragment key={order.id}>
                         <TableRow>
@@ -3817,7 +4116,9 @@ export function AdminDashboard() {
                               >
                                 {paymentStatusLabel(order.paymentStatus)}
                               </Badge>
-                              {order.paymentStatus !== 'paid' && order.status !== 'cancelled' ? (
+                              {order.paymentStatus !== 'paid' &&
+                              order.paymentStatus !== 'refunded' &&
+                              order.status !== 'cancelled' ? (
                                 <p className="text-[10px] font-medium text-orange-600">
                                   Due {currencySymbol}
                                   {order.totalAmount.toLocaleString()}
@@ -3828,11 +4129,22 @@ export function AdminDashboard() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              className={`text-xs ${statusColors[order.status] || 'bg-slate-100 text-slate-700'}`}
-                            >
-                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                            </Badge>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge
+                                className={`text-xs ${statusColors[order.status] || 'bg-slate-100 text-slate-700'}`}
+                              >
+                                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                              </Badge>
+                              {(order.returns?.length ?? 0) > 0 && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] border-amber-300 text-amber-800 bg-amber-50"
+                                  title="Return / exchange history"
+                                >
+                                  RMA ×{order.returns!.length}
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-sm text-slate-600">
                             {new Date(order.createdAt).toLocaleDateString()}
@@ -3855,6 +4167,64 @@ export function AdminDashboard() {
                                     </>
                                   )}
                                 </Button>
+                              ) : isRmaPending ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    className="h-8 rounded-lg bg-amber-700 hover:bg-amber-800 text-white px-3"
+                                    disabled={savingOrderId === order.id || !pendingRma}
+                                    onClick={() => void handleConfirmReturn(order)}
+                                  >
+                                    {savingOrderId === order.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                                    ) : (
+                                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                                    )}
+                                    {order.status === 'exchanging'
+                                      ? 'Confirm exchange'
+                                      : 'Confirm return'}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 rounded-lg px-2.5"
+                                    disabled={savingOrderId === order.id || !pendingRma}
+                                    title="Cancel pending return/exchange"
+                                    onClick={() => void handleCancelReturn(order)}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 rounded-lg px-2.5"
+                                    title="View invoice"
+                                    onClick={() => setInvoiceOrder(order)}
+                                  >
+                                    <FileText className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              ) : isRmaFinal ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 rounded-lg px-2.5"
+                                    title="View invoice"
+                                    onClick={() => setInvoiceOrder(order)}
+                                  >
+                                    <FileText className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 rounded-lg px-2.5 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                    title="Delete order"
+                                    onClick={() => openDeleteDialog('order', order.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
                               ) : (
                                 <>
                               <Select
@@ -3902,7 +4272,7 @@ export function AdminDashboard() {
                               )}
                               {order.paymentMethod === PAYMENT_METHODS.COD &&
                                 order.paymentStatus !== PAYMENT_STATUS.PAID &&
-                                order.status !== 'cancelled' && (
+                                order.status === 'delivered' && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -3916,6 +4286,17 @@ export function AdminDashboard() {
                                   ) : (
                                     <Banknote className="h-3.5 w-3.5" />
                                   )}
+                                </Button>
+                              )}
+                              {order.status === 'delivered' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 rounded-lg px-2.5 border-amber-200 text-amber-800 hover:bg-amber-50"
+                                  title="Return / Exchange"
+                                  onClick={() => setReturnExchangeOrder(order)}
+                                >
+                                  <ArrowLeftRight className="h-3.5 w-3.5" />
                                 </Button>
                               )}
                               {order.status !== 'cancelled' && (
@@ -3963,11 +4344,68 @@ export function AdminDashboard() {
                                       )}
                                       Confirm order
                                     </Button>
+                                  ) : isRmaPending ? (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Button
+                                        size="sm"
+                                        className="rounded-lg h-8 bg-amber-700 hover:bg-amber-800 text-white"
+                                        disabled={savingOrderId === order.id || !pendingRma}
+                                        onClick={() => void handleConfirmReturn(order)}
+                                      >
+                                        {savingOrderId === order.id ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                                        ) : (
+                                          <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                        )}
+                                        {order.status === 'exchanging'
+                                          ? 'Confirm exchange'
+                                          : 'Confirm return'}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="rounded-lg h-8"
+                                        disabled={savingOrderId === order.id || !pendingRma}
+                                        onClick={() => void handleCancelReturn(order)}
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="rounded-lg h-8"
+                                        onClick={() => setInvoiceOrder(order)}
+                                      >
+                                        <FileText className="h-3.5 w-3.5 mr-1.5" />
+                                        Invoice
+                                      </Button>
+                                    </div>
+                                  ) : isRmaFinal ? (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="rounded-lg h-8"
+                                        onClick={() => setInvoiceOrder(order)}
+                                      >
+                                        <FileText className="h-3.5 w-3.5 mr-1.5" />
+                                        Invoice
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="rounded-lg h-8 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                        onClick={() => openDeleteDialog('order', order.id)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                                        Delete
+                                      </Button>
+                                    </div>
                                   ) : (
                                   <div className="flex flex-wrap items-center gap-2">
                                     {order.paymentMethod === PAYMENT_METHODS.COD &&
                                       order.paymentStatus !== PAYMENT_STATUS.PAID &&
-                                      order.status !== 'cancelled' && (
+                                      order.status === 'delivered' && (
                                       <Button
                                         size="sm"
                                         className="rounded-lg h-8 bg-emerald-700 hover:bg-emerald-800 text-white"
@@ -3980,6 +4418,17 @@ export function AdminDashboard() {
                                           <Banknote className="h-3.5 w-3.5 mr-1.5" />
                                         )}
                                         Cash received
+                                      </Button>
+                                    )}
+                                    {order.status === 'delivered' && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="rounded-lg h-8 border-amber-300 text-amber-900 hover:bg-amber-50"
+                                        onClick={() => setReturnExchangeOrder(order)}
+                                      >
+                                        <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />
+                                        Return / Exchange
                                       </Button>
                                     )}
                                     {order.status !== 'cancelled' && (
@@ -3999,6 +4448,18 @@ export function AdminDashboard() {
                                 {isPending && (
                                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                                     Confirm this order to unlock status updates, payment, invoice, and delete actions.
+                                  </p>
+                                )}
+                                {isRmaPending && (
+                                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                    {order.status === 'exchanging'
+                                      ? 'Exchange pending — confirm to update stock (restore returned variant and deduct the new one).'
+                                      : 'Return pending — confirm when goods are received to restock inventory.'}
+                                  </p>
+                                )}
+                                {isRmaFinal && (
+                                  <p className="text-xs text-violet-800 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
+                                    This order is closed after return/exchange. Only invoice and delete are available.
                                   </p>
                                 )}
                                 <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
@@ -4097,6 +4558,209 @@ export function AdminDashboard() {
                                     <p className="text-xs text-slate-500">Via: {order.sslCardType}</p>
                                   ) : null}
                                 </div>
+                                {(order.returns?.length ?? 0) > 0 && (
+                                  <>
+                                    <Separator />
+                                    <div className="space-y-3">
+                                      <p className="text-xs uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                        <ArrowLeftRight className="h-3.5 w-3.5" />
+                                        Return / Exchange
+                                      </p>
+                                      {order.returns!.map((rma) => (
+                                        <div
+                                          key={rma.id}
+                                          className="rounded-lg border border-amber-200/80 bg-amber-50/40 px-3 py-3 space-y-2.5"
+                                        >
+                                          <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                              <Badge
+                                                className={
+                                                  rma.type === 'exchange'
+                                                    ? 'bg-amber-100 text-amber-900 hover:bg-amber-100'
+                                                    : 'bg-violet-100 text-violet-800 hover:bg-violet-100'
+                                                }
+                                              >
+                                                {rma.type === 'exchange' ? 'Exchange' : 'Return'}
+                                              </Badge>
+                                              {rma.status === 'pending' ? (
+                                                <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                                                  Awaiting confirm
+                                                </Badge>
+                                              ) : rma.status === 'cancelled' ? (
+                                                <Badge variant="outline" className="text-slate-500">
+                                                  Cancelled
+                                                </Badge>
+                                              ) : (
+                                                <Badge
+                                                  variant="outline"
+                                                  className="border-emerald-200 text-emerald-700 bg-emerald-50"
+                                                >
+                                                  Confirmed
+                                                </Badge>
+                                              )}
+                                              {rma.reason ? (
+                                                <span className="text-xs text-slate-600">
+                                                  {rma.reason}
+                                                </span>
+                                              ) : null}
+                                            </div>
+                                            <span className="text-[11px] text-slate-500">
+                                              {new Date(rma.createdAt).toLocaleString()}
+                                            </span>
+                                          </div>
+
+                                          <div className="space-y-2">
+                                            {rma.items.map((line) => {
+                                              const fromColor = resolveOrderItemColor(
+                                                null,
+                                                line.productName
+                                              )
+                                              const fromSize = resolveOrderItemSize(
+                                                null,
+                                                line.productName
+                                              )
+                                              const toName =
+                                                line.exchangeProductName ||
+                                                (line.exchangeColor || line.exchangeSize
+                                                  ? [
+                                                      orderItemBaseName(line.productName),
+                                                      [line.exchangeColor, line.exchangeSize]
+                                                        .filter(Boolean)
+                                                        .join(' / '),
+                                                    ]
+                                                      .filter(Boolean)
+                                                      .join(' — ')
+                                                  : null)
+                                              const toColor =
+                                                line.exchangeColor ||
+                                                (toName
+                                                  ? resolveOrderItemColor(null, toName)
+                                                  : '')
+                                              const toSize =
+                                                line.exchangeSize ||
+                                                (toName
+                                                  ? resolveOrderItemSize(null, toName)
+                                                  : '')
+                                              const isExchange =
+                                                rma.type === 'exchange' && !!toName
+
+                                              return (
+                                                <div
+                                                  key={line.id}
+                                                  className="rounded-md border border-slate-200 bg-white px-3 py-2.5"
+                                                >
+                                                  {isExchange ? (
+                                                    <div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-start">
+                                                      <div>
+                                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">
+                                                          From
+                                                        </p>
+                                                        <p className="text-sm font-medium text-slate-800">
+                                                          {orderItemBaseName(line.productName)}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500 mt-0.5">
+                                                          {[
+                                                            fromColor && `Color: ${fromColor}`,
+                                                            fromSize && `Size: ${fromSize}`,
+                                                            `Qty: ${line.quantity}`,
+                                                            typeof line.unitPrice === 'number' &&
+                                                              `${currencySymbol}${Math.round(line.unitPrice).toLocaleString()}`,
+                                                          ]
+                                                            .filter(Boolean)
+                                                            .join(' · ')}
+                                                        </p>
+                                                      </div>
+                                                      <div className="hidden sm:flex items-center justify-center pt-5 text-amber-700">
+                                                        <ArrowLeftRight className="h-4 w-4" />
+                                                      </div>
+                                                      <div>
+                                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 mb-1">
+                                                          To
+                                                        </p>
+                                                        <p className="text-sm font-medium text-slate-800">
+                                                          {orderItemBaseName(toName!)}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500 mt-0.5">
+                                                          {[
+                                                            toColor && `Color: ${toColor}`,
+                                                            toSize && `Size: ${toSize}`,
+                                                            `Qty: ${line.quantity}`,
+                                                            typeof (line.exchangeUnitPrice ??
+                                                              line.unitPrice) === 'number' &&
+                                                              `${currencySymbol}${Math.round(
+                                                                Number(
+                                                                  line.exchangeUnitPrice ??
+                                                                    line.unitPrice
+                                                                )
+                                                              ).toLocaleString()}`,
+                                                          ]
+                                                            .filter(Boolean)
+                                                            .join(' · ')}
+                                                        </p>
+                                                      </div>
+                                                    </div>
+                                                  ) : (
+                                                    <div>
+                                                      <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-700 mb-1">
+                                                        Returned
+                                                      </p>
+                                                      <p className="text-sm font-medium text-slate-800">
+                                                        {orderItemBaseName(line.productName)}
+                                                      </p>
+                                                      <p className="text-xs text-slate-500 mt-0.5">
+                                                        {[
+                                                          fromColor && `Color: ${fromColor}`,
+                                                          fromSize && `Size: ${fromSize}`,
+                                                          `Qty: ${line.quantity}`,
+                                                          typeof line.unitPrice === 'number' &&
+                                                            `${currencySymbol}${Math.round(line.unitPrice).toLocaleString()}`,
+                                                        ]
+                                                          .filter(Boolean)
+                                                          .join(' · ')}
+                                                      </p>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )
+                                            })}
+                                          </div>
+
+                                          {rma.notes ? (
+                                            <div className="rounded-md bg-white/80 border border-slate-200 px-3 py-2">
+                                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-0.5">
+                                                Notes
+                                              </p>
+                                              <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                                                {rma.notes}
+                                              </p>
+                                            </div>
+                                          ) : null}
+
+                                          {(Math.abs(rma.refundAmount) > 0.009 ||
+                                            rma.restocked !== undefined) && (
+                                            <p className="text-[11px] text-slate-500">
+                                              {[
+                                                rma.type === 'exchange' &&
+                                                Math.abs(rma.refundAmount) > 0.009
+                                                  ? rma.refundAmount > 0
+                                                    ? `Price adjustment: +${currencySymbol}${Math.round(rma.refundAmount).toLocaleString()}`
+                                                    : `Price adjustment: ${currencySymbol}${Math.round(rma.refundAmount).toLocaleString()}`
+                                                  : rma.type !== 'exchange' &&
+                                                      rma.refundAmount > 0
+                                                    ? `Refund: ${currencySymbol}${Math.round(rma.refundAmount).toLocaleString()}`
+                                                    : null,
+                                                rma.restocked === true && 'Restocked',
+                                                rma.restocked === false && 'Not restocked',
+                                              ]
+                                                .filter(Boolean)
+                                                .join(' · ')}
+                                            </p>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
                                 <Separator />
                                 <div className="flex items-center justify-between text-sm font-semibold">
                                   <span>Total</span>

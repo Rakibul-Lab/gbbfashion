@@ -11,7 +11,10 @@ export async function GET(
     const { id } = await params
     const order = await db.order.findUnique({
       where: { id },
-      include: { items: true },
+      include: {
+        items: true,
+        returns: { include: { items: true }, orderBy: { createdAt: 'desc' } },
+      },
     })
 
     if (!order) {

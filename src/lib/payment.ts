@@ -42,6 +42,10 @@ export function paymentStatusLabel(status: string | null | undefined): string {
       return 'Cancelled'
     case 'unpaid':
       return 'Unpaid'
+    case 'refunded':
+      return 'Refunded'
+    case 'partial_refund':
+      return 'Partial refund'
     default:
       return status || '—'
   }

@@ -270,8 +270,21 @@ function ProductCard({
   )
 }
 
-export function FeaturedCollections() {
-  const [activeTab, setActiveTab] = useState<CollectionTab>('bags')
+export function FeaturedCollections({
+  showBags = true,
+  showShoes = true,
+}: {
+  showBags?: boolean
+  showShoes?: boolean
+}) {
+  const availableTabs = useMemo(
+    () =>
+      tabs.filter((tab) => (tab.value === 'bags' ? showBags : showShoes)),
+    [showBags, showShoes]
+  )
+  const [activeTab, setActiveTab] = useState<CollectionTab>(
+    () => availableTabs[0]?.value ?? 'bags'
+  )
   const [products, setProducts] = useState<PrimeCardProduct[]>([])
   const [loading, setLoading] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -279,6 +292,13 @@ export function FeaturedCollections() {
   const [canScrollRight, setCanScrollRight] = useState(false)
   const trackedList = useRef<string | null>(null)
   const { goToShop } = useShopNavigation()
+
+  useEffect(() => {
+    if (availableTabs.length === 0) return
+    if (!availableTabs.some((t) => t.value === activeTab)) {
+      setActiveTab(availableTabs[0].value)
+    }
+  }, [availableTabs, activeTab])
 
   useEffect(() => {
     let cancelled = false
@@ -362,11 +382,13 @@ export function FeaturedCollections() {
     }
   }
 
+  if (availableTabs.length === 0) return null
+
   return (
     <section className="py-12 sm:py-16 lg:py-20 bg-white">
       <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-10 mb-10 sm:mb-12">
-          {tabs.map((tab) => (
+          {availableTabs.map((tab) => (
             <button
               key={tab.value}
               type="button"

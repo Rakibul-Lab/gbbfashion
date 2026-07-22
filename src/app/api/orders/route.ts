@@ -89,14 +89,20 @@ export async function GET(request: NextRequest) {
               : []),
           ],
         },
-        include: { items: true },
+        include: {
+          items: true,
+          returns: { include: { items: true }, orderBy: { createdAt: 'desc' } },
+        },
         orderBy: { createdAt: 'desc' },
       })
       return NextResponse.json(orders)
     }
 
     const orders = await db.order.findMany({
-      include: { items: true },
+      include: {
+        items: true,
+        returns: { include: { items: true }, orderBy: { createdAt: 'desc' } },
+      },
       orderBy: { createdAt: 'desc' },
     })
     return NextResponse.json(orders)

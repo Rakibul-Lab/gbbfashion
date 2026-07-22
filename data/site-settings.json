@@ -49,9 +49,14 @@
       "enabled": true
     },
     {
-      "key": "featuredCollections",
-      "label": "Featured Collections",
+      "key": "primeBags",
+      "label": "Prime Bags",
       "enabled": true
+    },
+    {
+      "key": "primeShoes",
+      "label": "Prime Shoes",
+      "enabled": false
     },
     {
       "key": "promoBanners",
@@ -220,5 +225,5 @@
     "message": "GBB Fashion is undergoing scheduled maintenance to improve your shopping experience. Thank you for your patience.",
     "eta": ""
   },
-  "updatedAt": "2026-07-21T10:50:51.282Z"
+  "updatedAt": "2026-07-22T05:53:18.691Z"
 }
