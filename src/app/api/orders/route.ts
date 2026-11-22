@@ -22,6 +22,9 @@ import {
   restoreStockForOrderItems,
 } from '@/lib/order-stock'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 type OrderItemInput = {
   productId: string
   productName: string
@@ -242,18 +245,30 @@ export async function POST(request: NextRequest) {
     }
 
     if (session?.user?.id) {
-      await db.user.update({
-        where: { id: session.user.id },
-        data: {
-          name: customerName,
-          ...(emailNormalized ? { email: emailNormalized } : {}),
-          phone: customerPhone || null,
-          shippingAddress: shippingAddress || null,
-          city: city || null,
-          state: state || null,
-          zipCode: zipCode || null,
-        },
-      })
+      try {
+        const sessionUser = await db.user.findUnique({
+          where: { id: session.user.id },
+          select: { id: true, role: true, name: true },
+        })
+
+        // NEVER overwrite an admin account from an order checkout!
+        if (sessionUser && sessionUser.role !== 'admin') {
+          await db.user.update({
+            where: { id: session.user.id },
+            data: {
+              // Keep customer's existing name if already set, only fill if empty
+              ...(sessionUser.name ? {} : { name: customerName }),
+              phone: customerPhone || null,
+              shippingAddress: shippingAddress || null,
+              city: city || null,
+              state: state || null,
+              zipCode: zipCode || null,
+            },
+          })
+        }
+      } catch (userUpdateErr) {
+        console.error('Failed to update customer user address after checkout:', userUpdateErr)
+      }
     }
 
     // Order is saved first and returned to the customer immediately.

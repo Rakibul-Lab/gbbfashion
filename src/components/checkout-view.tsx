@@ -191,14 +191,11 @@ export function CheckoutView() {
         throw new Error(data.error || 'Failed to create order')
       }
 
-      // Keep client session user in sync with profile updates from checkout
-      if (user) {
+      // Keep client session user in sync with profile updates from checkout (never overwrite admin account!)
+      if (user && user.role !== 'admin') {
         setUser({
           ...user,
-          name: form.customerName.trim(),
-          ...(form.customerEmail.trim()
-            ? { email: form.customerEmail.trim() }
-            : {}),
+          name: user.name || form.customerName.trim(),
         })
       }
 

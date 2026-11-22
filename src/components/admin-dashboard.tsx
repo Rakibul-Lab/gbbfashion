@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, Fragment } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useStore } from '@/lib/store'
 import { productThumbClass } from '@/lib/product-image'
@@ -104,6 +104,7 @@ import {
   ArrowLeftRight,
   PackagePlus,
   CalendarClock,
+  Code,
 } from 'lucide-react'
 import { OrderInvoiceDialog, type InvoiceOrder } from '@/components/order-invoice'
 import { OrderConfirmDialog } from '@/components/order-confirm-dialog'
@@ -123,7 +124,7 @@ import { exportToExcel, exportToPdf } from '@/lib/admin-export'
 import { AdminUsersPage } from '@/components/admin-users-page'
 import { AdminProfilePage } from '@/components/admin-profile-page'
 import { useCurrency, broadcastCurrency } from '@/hooks/use-currency'
-import { broadcastStoreSettings } from '@/hooks/use-store-commerce'
+import { useStoreCommerce, broadcastStoreSettings } from '@/hooks/use-store-commerce'
 import {
   CURRENCIES,
   currencyLabel,
@@ -136,6 +137,7 @@ import {
   DEFAULT_FREE_DELIVERY_MIN,
   DEFAULT_INSTAGRAM_URL,
   DEFAULT_TIKTOK_URL,
+  DEFAULT_DEVELOPER_CREDIT,
   DEFAULT_WHATSAPP_ICON_ID,
   DEFAULT_WHATSAPP_ICON_URL,
   DEFAULT_WHATSAPP_NUMBER,
@@ -166,6 +168,7 @@ import {
   resolveOrderItemColor,
   resolveOrderItemSize,
 } from '@/lib/product-stock'
+import { resolveOrderItemImage } from '@/lib/order-items'
 import {
   isReturnFinalStatus,
   isReturnPendingStatus,
@@ -534,6 +537,7 @@ export function AdminDashboard() {
   const setView = useStore((s) => s.setView)
   const setUser = useStore((s) => s.setUser)
   const user = useStore((s) => s.user)
+  const { developerCredit } = useStoreCommerce()
   const { logoUrl, logoWidth, logoHeight } = useSiteLogo()
   const { symbol: currencySymbol, format: formatMoney, code: currencyCode } = useCurrency()
   const router = useRouter()
@@ -606,6 +610,8 @@ export function AdminDashboard() {
   const [orderDateFrom, setOrderDateFrom] = useState('')
   const [orderDateTo, setOrderDateTo] = useState('')
   const [orderSort, setOrderSort] = useState<OrderSort>('newest')
+  const [orderPage, setOrderPage] = useState(1)
+  const [ordersPerPage, setOrdersPerPage] = useState(15)
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
   const [draftOrderStatuses, setDraftOrderStatuses] = useState<Record<string, string>>({})
   const [savingOrderId, setSavingOrderId] = useState<string | null>(null)
@@ -613,6 +619,9 @@ export function AdminDashboard() {
   const [confirmOrder, setConfirmOrder] = useState<Order | null>(null)
   const [cashReceivedOrder, setCashReceivedOrder] = useState<Order | null>(null)
   const [returnExchangeOrder, setReturnExchangeOrder] = useState<Order | null>(null)
+  const orderTableScrollRef = useRef<HTMLDivElement | null>(null)
+  const hasOrderTableDraggedRef = useRef(false)
+  const [isOrderTableDragging, setIsOrderTableDragging] = useState(false)
 
   // Delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -632,7 +641,7 @@ export function AdminDashboard() {
 
   const fetchOrders = useCallback(async () => {
     try {
-      const res = await fetch('/api/orders')
+      const res = await fetch('/api/orders', { cache: 'no-store' })
       const data = await res.json()
       if (!res.ok || !Array.isArray(data)) {
         console.error('Orders fetch failed', data)
@@ -744,9 +753,14 @@ export function AdminDashboard() {
 
   // ─── Stats ─────────────────────────────────────────────────────────────────
 
+  const isCancelledOrder = (o: Order) =>
+    (o.status || '').toLowerCase().trim() === 'cancelled'
+
+  const activeOrders = orders.filter((o) => !isCancelledOrder(o))
+
   const totalProducts = products.length
-  const totalOrders = orders.length
-  const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0)
+  const totalOrders = activeOrders.length
+  const totalRevenue = activeOrders.reduce((sum, o) => sum + o.totalAmount, 0)
   const totalUsers = users.length
 
   const isSameLocalDay = (iso: string | undefined, now = new Date()) => {
@@ -762,9 +776,9 @@ export function AdminDashboard() {
 
   const todayProducts = products.filter((p) => isSameLocalDay(p.createdAt)).length
   const todaysOrdersList = orders.filter((o) => isSameLocalDay(o.createdAt))
-  const todayOrders = todaysOrdersList.length
+  const todayOrders = todaysOrdersList.filter((o) => !isCancelledOrder(o)).length
   const todayRevenue = todaysOrdersList
-    .filter((o) => o.status !== 'cancelled')
+    .filter((o) => !isCancelledOrder(o))
     .reduce((sum, o) => sum + o.totalAmount, 0)
   const todayDelivered = orders.filter(
     (o) =>
@@ -774,7 +788,7 @@ export function AdminDashboard() {
 
   const revenueByCategory = categoryOptions.map((cat) => {
     const catProducts = products.filter((p) => p.category === cat.value)
-    const catOrders = orders.filter((o) =>
+    const catOrders = activeOrders.filter((o) =>
       o.items.some((item) => catProducts.some((p) => p.id === item.productId))
     )
     const revenue = catOrders.reduce((s, o) => s + o.totalAmount, 0)
@@ -1232,9 +1246,12 @@ export function AdminDashboard() {
         body: JSON.stringify({ status }),
       })
       if (!res.ok) throw new Error()
+      const updated = await res.json().catch(() => null)
       toast.success(
         status === 'delivered'
           ? 'Order marked delivered'
+          : status === 'cancelled'
+          ? 'Order cancelled'
           : 'Order status saved'
       )
       setDraftOrderStatuses((prev) => {
@@ -1242,7 +1259,14 @@ export function AdminDashboard() {
         delete next[orderId]
         return next
       })
-      fetchOrders()
+      if (updated && updated.id) {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? { ...o, ...updated } : o))
+        )
+      } else {
+        fetchOrders()
+      }
+      fetchProducts()
     } catch {
       toast.error('Failed to update order')
     } finally {
@@ -1483,6 +1507,92 @@ export function AdminDashboard() {
     orderDateTo,
     orderSort,
   ])
+
+  useEffect(() => {
+    setOrderPage(1)
+  }, [orderFilter, orderSearch, orderDatePreset, orderDateFrom, orderDateTo, orderSort, ordersPerPage])
+
+  const orderTotalPages = Math.max(1, Math.ceil(filteredOrders.length / ordersPerPage))
+  const paginatedOrders = useMemo(() => {
+    const page = Math.min(orderPage, orderTotalPages)
+    const start = (page - 1) * ordersPerPage
+    return filteredOrders.slice(start, start + ordersPerPage)
+  }, [filteredOrders, orderPage, orderTotalPages, ordersPerPage])
+
+  const setOrderTableScrollRef = useCallback((wrapper: HTMLDivElement | null) => {
+    if (!wrapper) {
+      orderTableScrollRef.current = null
+      return
+    }
+    const container =
+      wrapper.querySelector<HTMLDivElement>('[data-slot="table-container"]') || wrapper
+    orderTableScrollRef.current = container
+  }, [])
+
+  const handleOrderTableMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement
+    if (target.closest('button, a, input, select, textarea, [role="button"], [role="combobox"]')) {
+      return
+    }
+
+    const wrapper = e.currentTarget
+    const container =
+      wrapper.querySelector<HTMLDivElement>('[data-slot="table-container"]') ||
+      orderTableScrollRef.current ||
+      wrapper
+    if (!container) return
+
+    const startX = e.clientX
+    const startScrollLeft = container.scrollLeft
+    let isDragging = false
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const dx = moveEvent.clientX - startX
+      if (Math.abs(dx) > 3) {
+        if (!isDragging) {
+          isDragging = true
+          hasOrderTableDraggedRef.current = true
+          setIsOrderTableDragging(true)
+          document.body.style.userSelect = 'none'
+          document.body.style.cursor = 'grabbing'
+        }
+        moveEvent.preventDefault()
+        container.scrollLeft = startScrollLeft - dx
+      }
+    }
+
+    const onDragStart = (dragEvent: DragEvent) => {
+      dragEvent.preventDefault()
+    }
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      window.removeEventListener('dragstart', onDragStart)
+      if (isDragging) {
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
+        setIsOrderTableDragging(false)
+        setTimeout(() => {
+          hasOrderTableDraggedRef.current = false
+        }, 80)
+      } else {
+        hasOrderTableDraggedRef.current = false
+      }
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    window.addEventListener('dragstart', onDragStart)
+  }
+
+  const handleScrollOrderTable = (direction: 'left' | 'right') => {
+    const el = orderTableScrollRef.current
+    if (!el) return
+    const offset = direction === 'left' ? -350 : 350
+    el.scrollBy({ left: offset, behavior: 'smooth' })
+  }
 
   const ordersHaveActiveFilters =
     orderSearch.trim().length > 0 ||
@@ -1820,10 +1930,14 @@ export function AdminDashboard() {
         </div>
 
         <footer className="mt-auto border-t border-slate-200 bg-white px-4 py-4">
-          <p className="text-xs text-slate-500 text-center">
-            Developed by:{' '}
-            <span className="text-slate-600">Ahanaf Adud &amp; Rakibul Hassan</span>
-          </p>
+          {developerCredit ? (
+            <p className="text-xs text-slate-500 text-center">
+              Developed by:{' '}
+              <span className="text-slate-600">
+                {developerCredit.replace(/^developed by:?\s*/i, '')}
+              </span>
+            </p>
+          ) : null}
         </footer>
       </main>
 
@@ -1894,6 +2008,10 @@ export function AdminDashboard() {
         }}
         onConfirm={() => {
           if (confirmOrder) void handleConfirmOrder(confirmOrder.id)
+        }}
+        onCancelOrder={async (orderId) => {
+          await handleUpdateOrderStatus(orderId, 'cancelled')
+          setConfirmOrder(null)
         }}
       />
 
@@ -2542,6 +2660,7 @@ export function AdminDashboard() {
                     <TableRow>
                       <TableHead>Order ID</TableHead>
                       <TableHead>Customer</TableHead>
+                      <TableHead className="min-w-[180px]">Items</TableHead>
                       <TableHead>Total</TableHead>
                       <TableHead>Payment</TableHead>
                       <TableHead>Status</TableHead>
@@ -2558,6 +2677,44 @@ export function AdminDashboard() {
                           <div>
                             <p className="font-medium text-slate-900">{order.customerName}</p>
                             <p className="text-xs text-slate-500">{order.customerEmail}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="align-middle">
+                          <div className="space-y-1.5 py-1 min-w-[160px] max-w-[240px]">
+                            {order.items.slice(0, 2).map((item) => {
+                              const itemImg = resolveOrderItemImage(item, products)
+                              const baseName = orderItemBaseName(item.productName)
+                              return (
+                                <div key={item.id} className="flex items-center gap-2">
+                                  <div
+                                    className={`${productThumbClass} w-8 h-8 rounded-md border border-slate-200 shrink-0 bg-slate-50 overflow-hidden`}
+                                  >
+                                    {itemImg ? (
+                                      <img
+                                        src={itemImg}
+                                        alt={item.productName}
+                                        className="absolute inset-0 h-full w-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="flex h-full w-full items-center justify-center text-slate-300">
+                                        <Package className="h-3.5 w-3.5" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p
+                                    className="text-xs font-medium text-slate-800 line-clamp-1"
+                                    title={item.productName}
+                                  >
+                                    {baseName} {item.quantity > 1 ? `×${item.quantity}` : ''}
+                                  </p>
+                                </div>
+                              )
+                            })}
+                            {order.items.length > 2 && (
+                              <p className="text-[10px] text-slate-400 pl-10">
+                                +{order.items.length - 2} more item{order.items.length - 2 > 1 ? 's' : ''}
+                              </p>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">
@@ -3996,46 +4153,76 @@ export function AdminDashboard() {
           )}
         </div>
 
-        {/* Status filters */}
-        <div className="flex flex-wrap gap-2">
-          {statusFilters.map((status) => (
+        {/* Status filters & Scroll Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            {statusFilters.map((status) => (
+              <Button
+                key={status}
+                variant={orderFilter === status ? 'default' : 'outline'}
+                size="sm"
+                className={`rounded-lg capitalize ${
+                  orderFilter === status ? 'bg-slate-900 hover:bg-slate-800 text-white' : ''
+                }`}
+                onClick={() => setOrderFilter(status)}
+              >
+                {status}
+                {status !== 'all' && (
+                  <span className="ml-1.5 text-xs opacity-70">
+                    ({orders.filter((o) => o.status === status).length})
+                  </span>
+                )}
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+            <span className="text-xs text-slate-400 mr-1 hidden md:inline">Scroll table:</span>
             <Button
-              key={status}
-              variant={orderFilter === status ? 'default' : 'outline'}
+              type="button"
+              variant="outline"
               size="sm"
-              className={`rounded-lg capitalize ${
-                orderFilter === status ? 'bg-slate-900 hover:bg-slate-800 text-white' : ''
-              }`}
-              onClick={() => setOrderFilter(status)}
+              className="h-8 w-8 p-0 rounded-lg"
+              title="Scroll table left (or drag / wheel)"
+              onClick={() => handleScrollOrderTable('left')}
             >
-              {status}
-              {status !== 'all' && (
-                <span className="ml-1.5 text-xs opacity-70">
-                  ({orders.filter((o) => o.status === status).length})
-                </span>
-              )}
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-          ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0 rounded-lg"
+              title="Scroll table right (or drag / wheel)"
+              onClick={() => handleScrollOrderTable('right')}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Table */}
         <Card className="rounded-xl border-slate-200">
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
+            <div
+              ref={setOrderTableScrollRef}
+              onMouseDown={handleOrderTableMouseDown}
+              className={`w-full relative select-none ${isOrderTableDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            >
+              <Table className="w-full table-fixed min-w-[1680px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-8" />
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Items</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead>Size</TableHead>
-                    <TableHead>Total ({currencySymbol})</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="w-10 text-center px-1" />
+                    <TableHead className="w-36">Order ID</TableHead>
+                    <TableHead className="w-56">Customer</TableHead>
+                    <TableHead className="w-64">Items</TableHead>
+                    <TableHead className="w-24">Color</TableHead>
+                    <TableHead className="w-24">Size</TableHead>
+                    <TableHead className="w-28">Total ({currencySymbol})</TableHead>
+                    <TableHead className="w-36">Payment</TableHead>
+                    <TableHead className="w-32">Status</TableHead>
+                    <TableHead className="w-28">Date</TableHead>
+                    <TableHead className="w-80 min-w-[320px] text-right pr-6">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -4046,7 +4233,7 @@ export function AdminDashboard() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredOrders.map((order) => {
+                    paginatedOrders.map((order) => {
                       const variantSummary = summarizeOrderVariants(order.items)
                       const isPending = order.status === 'pending'
                       const isRmaPending = isReturnPendingStatus(order.status)
@@ -4054,13 +4241,30 @@ export function AdminDashboard() {
                       const pendingRma = pendingReturnForOrder(order)
                       return (
                       <Fragment key={order.id}>
-                        <TableRow>
-                          <TableCell>
+                        <TableRow
+                          onClick={(e) => {
+                            const target = e.target as HTMLElement
+                            if (target.closest('button, a, input, select, textarea, [role="button"], [role="combobox"]')) {
+                              return
+                            }
+                            if (hasOrderTableDraggedRef.current) {
+                              return
+                            }
+                            setExpandedOrder(expandedOrder === order.id ? null : order.id)
+                          }}
+                          className={`cursor-pointer transition-colors hover:bg-slate-50/80 ${
+                            expandedOrder === order.id ? 'bg-slate-50/70 font-medium' : ''
+                          }`}
+                        >
+                          <TableCell className="w-10 text-center px-1">
                             <button
-                              onClick={() =>
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 setExpandedOrder(expandedOrder === order.id ? null : order.id)
-                              }
-                              className="text-slate-400 hover:text-slate-600"
+                              }}
+                              className="text-slate-400 hover:text-slate-600 p-1"
+                              title={expandedOrder === order.id ? 'Collapse details' : 'View details'}
                             >
                               {expandedOrder === order.id ? (
                                 <ChevronUp className="h-4 w-4" />
@@ -4069,20 +4273,64 @@ export function AdminDashboard() {
                               )}
                             </button>
                           </TableCell>
-                          <TableCell className="font-mono text-xs">
+                          <TableCell className="font-mono text-xs w-36 select-text">
                             {order.id}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="w-56 select-text">
                             <div>
-                              <p className="font-medium text-slate-900">{order.customerName}</p>
-                              <p className="text-xs text-slate-500">{order.customerEmail}</p>
+                              <p className="font-medium text-slate-900 leading-snug">{order.customerName}</p>
+                              <p className="text-xs text-slate-500 truncate" title={order.customerEmail}>{order.customerEmail}</p>
                               <p className="text-xs text-slate-400">{order.customerPhone}</p>
                             </div>
                           </TableCell>
-                          <TableCell className="text-sm text-slate-600">
-                            {order.items.length} item(s)
+                          <TableCell className="align-middle w-64 select-text">
+                            <div className="space-y-2 py-1 max-w-[240px]">
+                              {order.items.map((item) => {
+                                const itemImg = resolveOrderItemImage(item, products)
+                                const baseName = orderItemBaseName(item.productName)
+                                const itemColor = resolveOrderItemColor(null, item.productName)
+                                const itemSize = resolveOrderItemSize(null, item.productName)
+                                return (
+                                  <div key={item.id} className="flex items-center gap-2.5">
+                                    <div
+                                      className={`${productThumbClass} w-10 h-10 rounded-md border border-slate-200 shrink-0 bg-slate-50 overflow-hidden`}
+                                    >
+                                      {itemImg ? (
+                                        <img
+                                          src={itemImg}
+                                          alt={item.productName}
+                                          draggable={false}
+                                          className="absolute inset-0 h-full w-full object-cover pointer-events-none select-none"
+                                        />
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-slate-300">
+                                          <Package className="h-4 w-4" />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p
+                                        className="text-xs font-medium text-slate-900 line-clamp-1 leading-snug"
+                                        title={item.productName}
+                                      >
+                                        {baseName}
+                                      </p>
+                                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                                        <span className="font-semibold text-slate-700">×{item.quantity}</span>
+                                        {itemColor && (
+                                          <span className="text-slate-500">· {itemColor}</span>
+                                        )}
+                                        {itemSize && (
+                                          <span className="text-slate-400">({itemSize})</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </TableCell>
-                          <TableCell className="text-sm text-slate-600 max-w-[120px]">
+                          <TableCell className="text-sm text-slate-600 w-24 select-text">
                             {variantSummary.colors.length > 0 ? (
                               <span className="line-clamp-2" title={variantSummary.colors.join(', ')}>
                                 {variantSummary.colors.join(', ')}
@@ -4091,7 +4339,7 @@ export function AdminDashboard() {
                               <span className="text-slate-400">—</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-sm text-slate-600 max-w-[100px]">
+                          <TableCell className="text-sm text-slate-600 w-24 select-text">
                             {variantSummary.sizes.length > 0 ? (
                               <span className="line-clamp-2" title={variantSummary.sizes.join(', ')}>
                                 {variantSummary.sizes.join(', ')}
@@ -4100,10 +4348,10 @@ export function AdminDashboard() {
                               <span className="text-slate-400">—</span>
                             )}
                           </TableCell>
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium w-28 tabular-nums select-text">
                             {currencySymbol}{order.totalAmount.toLocaleString()}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="w-36 select-text">
                             <div className="space-y-1 min-w-[8.5rem]">
                               <p className="text-xs font-semibold text-slate-800">
                                 {paymentMethodLabel(order.paymentMethod)}
@@ -4128,7 +4376,7 @@ export function AdminDashboard() {
                               ) : null}
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="w-32">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <Badge
                                 className={`text-xs ${statusColors[order.status] || 'bg-slate-100 text-slate-700'}`}
@@ -4146,32 +4394,51 @@ export function AdminDashboard() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-sm text-slate-600">
+                          <TableCell className="text-sm text-slate-600 w-28 whitespace-nowrap select-text">
                             {new Date(order.createdAt).toLocaleDateString()}
                           </TableCell>
-                          <TableCell className="text-right">
-                            <div className="inline-flex items-center justify-end gap-2">
+                          <TableCell className="text-right w-80 min-w-[320px] pr-6">
+                            <div className="flex items-center justify-end gap-1.5">
                               {isPending ? (
-                                <Button
-                                  size="sm"
-                                  className="h-8 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-3"
-                                  disabled={savingOrderId === order.id}
-                                  onClick={() => setConfirmOrder(order)}
-                                >
-                                  {savingOrderId === order.id ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <>
-                                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                                      Confirm order
-                                    </>
-                                  )}
-                                </Button>
-                              ) : isRmaPending ? (
-                                <>
+                                <div className="flex items-center justify-end gap-1.5 ml-auto">
                                   <Button
                                     size="sm"
-                                    className="h-8 rounded-lg bg-amber-700 hover:bg-amber-800 text-white px-3"
+                                    className="h-8 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-3 shrink-0"
+                                    disabled={savingOrderId === order.id}
+                                    onClick={() => setConfirmOrder(order)}
+                                  >
+                                    {savingOrderId === order.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                                    ) : (
+                                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                                    )}
+                                    Confirm order
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 w-8 p-0 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 shrink-0"
+                                    disabled={savingOrderId === order.id}
+                                    title="Cancel order"
+                                    onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 w-8 p-0 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 shrink-0"
+                                    title="Delete order"
+                                    onClick={() => openDeleteDialog('order', order.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              ) : isRmaPending ? (
+                                <div className="flex items-center justify-end gap-1.5 ml-auto">
+                                  <Button
+                                    size="sm"
+                                    className="h-8 rounded-lg bg-amber-700 hover:bg-amber-800 text-white px-3 shrink-0"
                                     disabled={savingOrderId === order.id || !pendingRma}
                                     onClick={() => void handleConfirmReturn(order)}
                                   >
@@ -4187,7 +4454,7 @@ export function AdminDashboard() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-8 rounded-lg px-2.5"
+                                    className="h-8 rounded-lg px-2.5 shrink-0"
                                     disabled={savingOrderId === order.id || !pendingRma}
                                     title="Cancel pending return/exchange"
                                     onClick={() => void handleCancelReturn(order)}
@@ -4197,19 +4464,21 @@ export function AdminDashboard() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-8 rounded-lg px-2.5"
+                                    className="h-8 w-8 p-0 rounded-lg shrink-0"
                                     title="View invoice"
                                     onClick={() => setInvoiceOrder(order)}
                                   >
                                     <FileText className="h-3.5 w-3.5" />
                                   </Button>
-                                </>
+                                </div>
                               ) : isRmaFinal ? (
-                                <>
+                                <div className="flex items-center justify-end gap-1.5 ml-auto">
+                                  <div className="w-8 h-8 shrink-0" />
+                                  <div className="w-8 h-8 shrink-0" />
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-8 rounded-lg px-2.5"
+                                    className="h-8 w-8 p-0 rounded-lg shrink-0"
                                     title="View invoice"
                                     onClick={() => setInvoiceOrder(order)}
                                   >
@@ -4218,132 +4487,173 @@ export function AdminDashboard() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-8 rounded-lg px-2.5 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                    className="h-8 w-8 p-0 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 shrink-0"
                                     title="Delete order"
                                     onClick={() => openDeleteDialog('order', order.id)}
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
-                                </>
+                                </div>
                               ) : (
                                 <>
-                              <Select
-                                value={draftOrderStatuses[order.id] ?? order.status}
-                                onValueChange={(value) =>
-                                  setDraftOrderStatuses((prev) => ({
-                                    ...prev,
-                                    [order.id]: value,
-                                  }))
-                                }
-                              >
-                                <SelectTrigger className="h-8 w-32 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="processing">Processing</SelectItem>
-                                  <SelectItem value="shipped">Shipped</SelectItem>
-                                  <SelectItem value="delivered">Delivered</SelectItem>
-                                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              {(draftOrderStatuses[order.id] ?? order.status) !==
-                                order.status && (
-                                <Button
-                                  size="sm"
-                                  className="h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-white px-3"
-                                  disabled={savingOrderId === order.id}
-                                  onClick={() =>
-                                    handleUpdateOrderStatus(
-                                      order.id,
-                                      draftOrderStatuses[order.id] ?? order.status
-                                    )
-                                  }
-                                >
-                                  {savingOrderId === order.id ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <>
-                                      <Save className="h-3.5 w-3.5 mr-1" />
-                                      Save
-                                    </>
-                                  )}
-                                </Button>
-                              )}
-                              {order.paymentMethod === PAYMENT_METHODS.COD &&
-                                order.paymentStatus !== PAYMENT_STATUS.PAID &&
-                                order.status === 'delivered' && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 rounded-lg px-2.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-                                  title="Cash received"
-                                  disabled={savingOrderId === order.id}
-                                  onClick={() => setCashReceivedOrder(order)}
-                                >
-                                  {savingOrderId === order.id ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Banknote className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              )}
-                              {order.status === 'delivered' && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 rounded-lg px-2.5 border-amber-200 text-amber-800 hover:bg-amber-50"
-                                  title="Return / Exchange"
-                                  onClick={() => setReturnExchangeOrder(order)}
-                                >
-                                  <ArrowLeftRight className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              {order.status !== 'cancelled' && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 rounded-lg px-2.5"
-                                  title="View invoice"
-                                  onClick={() => setInvoiceOrder(order)}
-                                >
-                                  <FileText className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 rounded-lg px-2.5 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                                title="Delete order"
-                                onClick={() => openDeleteDialog('order', order.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                                  <div className="flex items-center gap-1.5">
+                                    <Select
+                                      value={draftOrderStatuses[order.id] ?? order.status}
+                                      onValueChange={(value) =>
+                                        setDraftOrderStatuses((prev) => ({
+                                          ...prev,
+                                          [order.id]: value,
+                                        }))
+                                      }
+                                    >
+                                      <SelectTrigger className="h-8 w-28 text-xs shrink-0">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="pending">Pending</SelectItem>
+                                        <SelectItem value="processing">Processing</SelectItem>
+                                        <SelectItem value="shipped">Shipped</SelectItem>
+                                        <SelectItem value="delivered">Delivered</SelectItem>
+                                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    {(draftOrderStatuses[order.id] ?? order.status) !==
+                                      order.status && (
+                                      <Button
+                                        size="sm"
+                                        className="h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-white px-2.5 text-xs shrink-0"
+                                        disabled={savingOrderId === order.id}
+                                        onClick={() =>
+                                          handleUpdateOrderStatus(
+                                            order.id,
+                                            draftOrderStatuses[order.id] ?? order.status
+                                          )
+                                        }
+                                      >
+                                        {savingOrderId === order.id ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <>
+                                            <Save className="h-3 w-3 mr-1" />
+                                            Save
+                                          </>
+                                        )}
+                                      </Button>
+                                    )}
+                                  </div>
+
+                                  {/* Fixed 4-slot grid: Cash, Exchange, Invoice, Delete */}
+                                  <div className="flex items-center gap-1.5 ml-auto">
+                                    {/* Slot 1: Cash received */}
+                                    {order.paymentMethod === PAYMENT_METHODS.COD &&
+                                    order.paymentStatus !== PAYMENT_STATUS.PAID &&
+                                    order.status === 'delivered' ? (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 w-8 p-0 rounded-lg border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 shrink-0"
+                                        title="Cash received"
+                                        disabled={savingOrderId === order.id}
+                                        onClick={() => setCashReceivedOrder(order)}
+                                      >
+                                        {savingOrderId === order.id ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <Banknote className="h-3.5 w-3.5" />
+                                        )}
+                                      </Button>
+                                    ) : (
+                                      <div className="w-8 h-8 shrink-0" />
+                                    )}
+
+                                    {/* Slot 2: Return / Exchange */}
+                                    {order.status === 'delivered' ? (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 w-8 p-0 rounded-lg border-amber-200 text-amber-800 hover:bg-amber-50 shrink-0"
+                                        title="Return / Exchange"
+                                        onClick={() => setReturnExchangeOrder(order)}
+                                      >
+                                        <ArrowLeftRight className="h-3.5 w-3.5" />
+                                      </Button>
+                                    ) : (
+                                      <div className="w-8 h-8 shrink-0" />
+                                    )}
+
+                                    {/* Slot 3: Invoice */}
+                                    {order.status !== 'cancelled' ? (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 w-8 p-0 rounded-lg shrink-0"
+                                        title="View invoice"
+                                        onClick={() => setInvoiceOrder(order)}
+                                      >
+                                        <FileText className="h-3.5 w-3.5" />
+                                      </Button>
+                                    ) : (
+                                      <div className="w-8 h-8 shrink-0" />
+                                    )}
+
+                                    {/* Slot 4: Delete */}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 w-8 p-0 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 shrink-0"
+                                      title="Delete order"
+                                      onClick={() => openDeleteDialog('order', order.id)}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
                                 </>
                               )}
                             </div>
                           </TableCell>
                         </TableRow>
                         {expandedOrder === order.id && (
-                          <TableRow>
-                            <TableCell colSpan={orderColSpan} className="bg-slate-50/50 px-8 py-4">
+                          <TableRow className="hover:bg-transparent cursor-default">
+                            <TableCell colSpan={orderColSpan} className="bg-slate-50/50 px-8 py-4 cursor-default">
                               <div className="space-y-3">
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                   <p className="text-sm font-medium text-slate-700">Order Items</p>
                                   {isPending ? (
-                                    <Button
-                                      size="sm"
-                                      className="rounded-lg h-8 bg-emerald-700 hover:bg-emerald-800 text-white"
-                                      disabled={savingOrderId === order.id}
-                                      onClick={() => setConfirmOrder(order)}
-                                    >
-                                      {savingOrderId === order.id ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                                      ) : (
-                                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                                      )}
-                                      Confirm order
-                                    </Button>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Button
+                                        size="sm"
+                                        className="rounded-lg h-8 bg-emerald-700 hover:bg-emerald-800 text-white"
+                                        disabled={savingOrderId === order.id}
+                                        onClick={() => setConfirmOrder(order)}
+                                      >
+                                        {savingOrderId === order.id ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                                        ) : (
+                                          <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                        )}
+                                        Confirm order
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="rounded-lg h-8 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                        disabled={savingOrderId === order.id}
+                                        onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
+                                      >
+                                        <X className="h-3.5 w-3.5 mr-1.5" />
+                                        Cancel order
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="rounded-lg h-8 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                        title="Delete order"
+                                        onClick={() => openDeleteDialog('order', order.id)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                                        Delete
+                                      </Button>
+                                    </div>
                                   ) : isRmaPending ? (
                                     <div className="flex flex-wrap items-center gap-2">
                                       <Button
@@ -4447,7 +4757,7 @@ export function AdminDashboard() {
                                 </div>
                                 {isPending && (
                                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                                    Confirm this order to unlock status updates, payment, invoice, and delete actions.
+                                    Confirm this order to mark as processing, or cancel if requested by the customer.
                                   </p>
                                 )}
                                 {isRmaPending && (
@@ -4473,14 +4783,32 @@ export function AdminDashboard() {
                                 {order.items.map((item) => {
                                   const color = resolveOrderItemColor(null, item.productName)
                                   const size = resolveOrderItemSize(null, item.productName)
+                                  const itemImg = resolveOrderItemImage(item, products)
                                   return (
                                   <div
                                     key={item.id}
                                     className="grid grid-cols-[1fr_88px_72px_64px_88px] gap-2 px-3 py-2 text-sm border-t border-slate-100 items-center"
                                   >
-                                    <span className="text-slate-700 line-clamp-2">
-                                      {orderItemBaseName(item.productName)}
-                                    </span>
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div
+                                        className={`${productThumbClass} w-8 h-8 rounded-md border border-slate-200 shrink-0 bg-slate-50 overflow-hidden`}
+                                      >
+                                        {itemImg ? (
+                                          <img
+                                            src={itemImg}
+                                            alt={item.productName}
+                                            className="absolute inset-0 h-full w-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="flex h-full w-full items-center justify-center text-slate-300">
+                                            <Package className="h-3.5 w-3.5" />
+                                          </div>
+                                        )}
+                                      </div>
+                                      <span className="text-slate-700 line-clamp-2">
+                                        {orderItemBaseName(item.productName)}
+                                      </span>
+                                    </div>
                                     <span className="text-slate-600">
                                       {color || '—'}
                                     </span>
@@ -4777,6 +5105,76 @@ export function AdminDashboard() {
                 </TableBody>
               </Table>
             </div>
+            {/* Pagination */}
+            {filteredOrders.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-200 bg-slate-50/50">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                  <span>
+                    Showing{' '}
+                    <strong className="font-semibold text-slate-900">
+                      {(orderPage - 1) * ordersPerPage + 1}
+                    </strong>{' '}
+                    to{' '}
+                    <strong className="font-semibold text-slate-900">
+                      {Math.min(orderPage * ordersPerPage, filteredOrders.length)}
+                    </strong>{' '}
+                    of{' '}
+                    <strong className="font-semibold text-slate-900">{filteredOrders.length}</strong> orders
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-400">·</span>
+                    <span>Per page:</span>
+                    <Select
+                      value={String(ordersPerPage)}
+                      onValueChange={(val) => {
+                        setOrdersPerPage(Number(val))
+                        setOrderPage(1)
+                      }}
+                    >
+                      <SelectTrigger className="h-7 w-[68px] text-xs bg-white rounded-md">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="15">15</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2.5 text-xs rounded-lg"
+                    disabled={orderPage <= 1}
+                    onClick={() => setOrderPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1 px-1.5 text-xs text-slate-600">
+                    <span>Page</span>
+                    <strong className="font-semibold text-slate-900">{orderPage}</strong>
+                    <span>of</span>
+                    <strong className="font-semibold text-slate-900">{orderTotalPages}</strong>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2.5 text-xs rounded-lg"
+                    disabled={orderPage >= orderTotalPages}
+                    onClick={() => setOrderPage((p) => Math.min(orderTotalPages, p + 1))}
+                  >
+                    Next
+                    <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -4809,6 +5207,10 @@ export function AdminDashboard() {
     const [facebookUrl, setFacebookUrl] = useState(DEFAULT_FACEBOOK_URL)
     const [instagramUrl, setInstagramUrl] = useState(DEFAULT_INSTAGRAM_URL)
     const [tiktokUrl, setTiktokUrl] = useState(DEFAULT_TIKTOK_URL)
+    const [developerCreditInput, setDeveloperCreditInput] = useState(
+      developerCredit || DEFAULT_DEVELOPER_CREDIT
+    )
+    const [savingDeveloperCredit, setSavingDeveloperCredit] = useState(false)
     const [savingCommerce, setSavingCommerce] = useState(false)
 
     const [invoiceEmail, setInvoiceEmail] = useState<InvoiceEmailSettings>(DEFAULT_INVOICE_EMAIL)
@@ -4887,6 +5289,9 @@ export function AdminDashboard() {
           }
           if (typeof data?.tiktokUrl === 'string') {
             setTiktokUrl(data.tiktokUrl)
+          }
+          if (typeof data?.developerCredit === 'string') {
+            setDeveloperCreditInput(data.developerCredit)
           }
           if (data?.invoiceEmail) {
             setInvoiceEmail(normalizeInvoiceEmailSettings(data.invoiceEmail))
@@ -5020,6 +5425,7 @@ export function AdminDashboard() {
             facebookUrl,
             instagramUrl,
             tiktokUrl,
+            developerCredit: developerCreditInput.trim(),
           }),
         })
         const data = await res.json()
@@ -5058,12 +5464,42 @@ export function AdminDashboard() {
           facebookUrl: nextFacebook,
           instagramUrl: nextInstagram,
           tiktokUrl: nextTiktok,
+          developerCredit: developerCreditInput.trim(),
         })
         toast.success('Store contact, social & delivery settings saved')
       } catch {
         toast.error('Could not save store contact & delivery')
       } finally {
         setSavingCommerce(false)
+      }
+    }
+
+    const handleSaveDeveloperCredit = async () => {
+      setSavingDeveloperCredit(true)
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            developerCredit: developerCreditInput.trim(),
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          toast.error(data.error || 'Could not save developer credit')
+          return
+        }
+        const nextCredit =
+          typeof data.developerCredit === 'string'
+            ? data.developerCredit
+            : developerCreditInput.trim()
+        setDeveloperCreditInput(nextCredit)
+        broadcastStoreSettings({ developerCredit: nextCredit })
+        toast.success('Developer credit updated')
+      } catch {
+        toast.error('Could not save developer credit')
+      } finally {
+        setSavingDeveloperCredit(false)
       }
     }
 
@@ -5840,6 +6276,47 @@ export function AdminDashboard() {
                 <Save className="h-4 w-4 mr-2" />
               )}
               Save social links
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl border-slate-200">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Code className="h-5 w-5 text-indigo-600" />
+              Footer Developer Credit
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-slate-500">
+              Customize the &ldquo;Developed by&rdquo; credit shown at the bottom of both the storefront and admin panel.
+            </p>
+            <div className="space-y-2 max-w-xl">
+              <Label htmlFor="developer-credit">Developed by</Label>
+              <Input
+                id="developer-credit"
+                value={developerCreditInput}
+                onChange={(e) => setDeveloperCreditInput(e.target.value)}
+                placeholder="Ahanaf Adud & Rakibul Hassan"
+              />
+              <p className="text-xs text-slate-400">
+                Preview: Developed by:{' '}
+                <span className="font-medium text-slate-600">
+                  {developerCreditInput.trim().replace(/^developed by:?\s*/i, '') || '...'}
+                </span>
+              </p>
+            </div>
+            <Button
+              onClick={() => void handleSaveDeveloperCredit()}
+              disabled={savingDeveloperCredit}
+              className="bg-slate-900 hover:bg-slate-800 text-white"
+            >
+              {savingDeveloperCredit ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save developer credit
             </Button>
           </CardContent>
         </Card>

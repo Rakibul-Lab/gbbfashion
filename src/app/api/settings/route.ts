@@ -74,6 +74,9 @@ export async function PUT(request: NextRequest) {
     if (typeof body.tiktokUrl === 'string') {
       patch.tiktokUrl = body.tiktokUrl
     }
+    if (typeof body.developerCredit === 'string') {
+      patch.developerCredit = body.developerCredit.trim()
+    }
     if (Array.isArray(body.announcements)) {
       patch.announcements = body.announcements.map(String)
     }

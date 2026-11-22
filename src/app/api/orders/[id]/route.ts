@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PAYMENT_METHODS, PAYMENT_STATUS } from '@/lib/payment'
 import { restoreStockForOrderItems } from '@/lib/order-stock'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -10,6 +10,7 @@ import {
   Package,
   Pencil,
   Save,
+  Trash2,
   User,
   X,
 } from 'lucide-react'
@@ -133,6 +134,7 @@ interface OrderConfirmDialogProps {
   confirming?: boolean
   onConfirm: () => void
   onOrderUpdated?: (order: InvoiceOrder) => void
+  onCancelOrder?: (orderId: string) => Promise<void> | void
 }
 
 export function OrderConfirmDialog({
@@ -144,12 +146,15 @@ export function OrderConfirmDialog({
   confirming = false,
   onConfirm,
   onOrderUpdated,
+  onCancelOrder,
 }: OrderConfirmDialogProps) {
   const [localOrder, setLocalOrder] = useState<InvoiceOrder | null>(order)
   const [editingRows, setEditingRows] = useState<Record<string, boolean>>({})
   const [drafts, setDrafts] = useState<Record<string, ItemDraft>>({})
   const [savedDrafts, setSavedDrafts] = useState<Record<string, ItemDraft>>({})
   const [savingItemId, setSavingItemId] = useState<string | null>(null)
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
+  const [cancellingOrder, setCancellingOrder] = useState(false)
 
   useEffect(() => {
     if (!order) {
@@ -253,6 +258,85 @@ export function OrderConfirmDialog({
       toast.error(err instanceof Error ? err.message : 'Failed to save item')
     } finally {
       setSavingItemId(null)
+    }
+  }
+
+  const handleDeleteItem = async (itemId: string) => {
+    if (!localOrder) return
+    const item = localOrder.items.find((i) => i.id === itemId)
+    const name = item ? orderItemBaseName(item.productName) : 'this product'
+    if (
+      !window.confirm(
+        `Are you sure you want to remove ${name} from this order? Stock will be restored and order total updated.`
+      )
+    ) {
+      return
+    }
+
+    setDeletingItemId(itemId)
+    try {
+      const res = await fetch(`/api/orders/${localOrder.id}/items/${itemId}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === 'string' ? data.error : 'Failed to remove product'
+        )
+      }
+
+      if (data.status === 'cancelled') {
+        toast.success('Order cancelled as all products were removed')
+        onOrderUpdated?.(data)
+        onOpenChange(false)
+        return
+      }
+
+      toast.success('Product removed — stock & order total updated')
+      setLocalOrder(data)
+      const refreshed: Record<string, ItemDraft> = {}
+      for (const it of data.items) {
+        refreshed[it.id] = draftFromItem(it)
+      }
+      setDrafts(refreshed)
+      setSavedDrafts(refreshed)
+      onOrderUpdated?.(data)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to remove product')
+    } finally {
+      setDeletingItemId(null)
+    }
+  }
+
+  const handleCancelOrderClick = async () => {
+    if (!localOrder) return
+    if (
+      !window.confirm(
+        `Are you sure you want to cancel order ${localOrder.id}? Stock will be restored and its price will be deducted from dashboard revenue.`
+      )
+    ) {
+      return
+    }
+    setCancellingOrder(true)
+    try {
+      if (onCancelOrder) {
+        await onCancelOrder(localOrder.id)
+      } else {
+        const res = await fetch(`/api/orders/${localOrder.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'cancelled' }),
+        })
+        if (!res.ok) throw new Error('Failed to cancel order')
+        const updated = await res.json()
+        onOrderUpdated?.(updated)
+        toast.success('Order cancelled')
+      }
+      onOpenChange(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to cancel order')
+    } finally {
+      setCancellingOrder(false)
     }
   }
 
@@ -552,17 +636,34 @@ export function OrderConfirmDialog({
                               </Button>
                             </div>
                           ) : (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-7 px-2 text-[10px] rounded-md"
-                              disabled={confirming || savingItemId !== null}
-                              onClick={() => startEditRow(item.id)}
-                            >
-                              <Pencil className="h-3 w-3 mr-0.5" />
-                              Edit
-                            </Button>
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-[10px] rounded-md"
+                                disabled={confirming || savingItemId !== null || deletingItemId !== null}
+                                onClick={() => startEditRow(item.id)}
+                              >
+                                <Pencil className="h-3 w-3 mr-0.5" />
+                                Edit
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-1.5 text-[10px] rounded-md text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                disabled={confirming || savingItemId !== null || deletingItemId === item.id}
+                                onClick={() => void handleDeleteItem(item.id)}
+                                title="Remove product from order"
+                              >
+                                {deletingItemId === item.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-3 w-3" />
+                                )}
+                              </Button>
+                            </div>
                           )}
                         </TableCell>
                       </TableRow>
@@ -636,21 +737,38 @@ export function OrderConfirmDialog({
         </div>
 
         <DialogFooter className="px-5 py-3 border-t border-slate-200 bg-slate-50/80 sm:justify-between shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="rounded-lg h-8"
-            disabled={confirming || savingItemId !== null}
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-lg h-8"
+              disabled={confirming || savingItemId !== null || deletingItemId !== null || cancellingOrder}
+              onClick={() => onOpenChange(false)}
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-lg h-8 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+              disabled={confirming || savingItemId !== null || deletingItemId !== null || cancellingOrder}
+              onClick={() => void handleCancelOrderClick()}
+            >
+              {cancellingOrder ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <X className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Cancel Order
+            </Button>
+          </div>
           <Button
             type="button"
             size="sm"
             className="rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white min-w-[140px] h-8"
-            disabled={confirming || hasUnsavedChanges || savingItemId !== null}
+            disabled={confirming || hasUnsavedChanges || savingItemId !== null || deletingItemId !== null || cancellingOrder}
             onClick={onConfirm}
           >
             {confirming ? (

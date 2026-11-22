@@ -21,6 +21,8 @@ import {
   DEFAULT_FACEBOOK_URL,
   DEFAULT_INSTAGRAM_URL,
   DEFAULT_TIKTOK_URL,
+  DEFAULT_DEVELOPER_CREDIT,
+  normalizeDeveloperCredit,
   normalizeWhatsAppNumber,
   normalizeMoneyAmount,
   normalizeWhatsAppIconId,
@@ -68,7 +70,9 @@ export {
   DEFAULT_FACEBOOK_URL,
   DEFAULT_INSTAGRAM_URL,
   DEFAULT_TIKTOK_URL,
+  DEFAULT_DEVELOPER_CREDIT,
   WHATSAPP_ICON_PRESETS,
+  normalizeDeveloperCredit,
   normalizeWhatsAppNumber,
   normalizeMoneyAmount,
   normalizeWhatsAppIconId,
@@ -126,6 +130,7 @@ export type SiteSettings = {
   facebookUrl: string
   instagramUrl: string
   tiktokUrl: string
+  developerCredit: string
   announcements: string[]
   promoBanners: PromoBannerConfig[]
   homepageSections: HomepageSectionConfig[]
@@ -196,6 +201,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
           : DEFAULT_FACEBOOK_URL,
       instagramUrl: normalizeSocialUrl(parsed.instagramUrl, DEFAULT_INSTAGRAM_URL),
       tiktokUrl: normalizeSocialUrl(parsed.tiktokUrl, DEFAULT_TIKTOK_URL),
+      developerCredit: normalizeDeveloperCredit(parsed.developerCredit),
       announcements:
         Array.isArray(parsed.announcements) && parsed.announcements.length > 0
           ? parsed.announcements.map(String)
@@ -236,6 +242,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
       facebookUrl: DEFAULT_FACEBOOK_URL,
       instagramUrl: DEFAULT_INSTAGRAM_URL,
       tiktokUrl: DEFAULT_TIKTOK_URL,
+      developerCredit: DEFAULT_DEVELOPER_CREDIT,
       announcements: DEFAULT_ANNOUNCEMENTS,
       promoBanners: normalizePromoBanners(null),
       homepageSections: mergeHomepageSections(null),
@@ -301,6 +308,10 @@ export async function saveSiteSettings(patch: Partial<SiteSettings>): Promise<Si
       patch.tiktokUrl !== undefined
         ? normalizeSocialUrl(patch.tiktokUrl, current.tiktokUrl)
         : current.tiktokUrl,
+    developerCredit:
+      patch.developerCredit !== undefined
+        ? normalizeDeveloperCredit(patch.developerCredit)
+        : current.developerCredit,
     announcements: patch.announcements ?? current.announcements,
     promoBanners: normalizePromoBanners(patch.promoBanners ?? current.promoBanners),
     homepageSections: mergeHomepageSections(

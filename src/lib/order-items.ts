@@ -2,6 +2,7 @@ import {
   resolveOrderItemColor,
   resolveOrderItemSize,
 } from '@/lib/product-stock'
+import { resolveProductColorVariants } from '@/lib/product-colors'
 
 /** Product name without variant suffix ("Name — Color / Size"). */
 export function orderItemBaseName(productName: string): string {
@@ -92,4 +93,66 @@ export function orderTotalAfterItemChange(
   const newSubtotal = nextItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const shipping = Math.max(0, Math.round((previousTotal - oldSubtotal) * 100) / 100)
   return Math.round((newSubtotal + shipping) * 100) / 100
+}
+
+export type ProductImageLookup = {
+  id: string
+  name?: string
+  image: string
+  secondaryImage?: string | null
+  galleryImages?: string | null
+  colors?: string | null
+}
+
+/**
+ * Resolves the specific color variant image for an order item,
+ * falling back to the product's primary image or secondary image.
+ */
+export function resolveOrderItemImage(
+  item: { productId?: string | null; productName: string },
+  products: ProductImageLookup[],
+): string {
+  const color = resolveOrderItemColor(null, item.productName)
+  const baseName = orderItemBaseName(item.productName).trim().toLowerCase()
+
+  const product =
+    (item.productId ? products.find((p) => p.id === item.productId) : null) ||
+    products.find(
+      (p) =>
+        (p.name && p.name.trim().toLowerCase() === baseName) ||
+        (p.name && baseName.includes(p.name.trim().toLowerCase())) ||
+        (p.name && p.name.trim().toLowerCase().includes(baseName))
+    )
+
+  if (!product) return ''
+
+  if (color) {
+    try {
+      const variants = resolveProductColorVariants({
+        image: product.image,
+        secondaryImage: product.secondaryImage,
+        galleryImages: product.galleryImages,
+        colors: product.colors,
+      })
+      const colorLower = color.trim().toLowerCase()
+      // Clean color from any trailing size in parentheses e.g. "Beige (14)" -> "beige"
+      const cleanColor = colorLower.replace(/\s*\(.*?\)\s*/g, '').trim()
+      const matched =
+        variants.find((v) => v.name && v.name.trim().toLowerCase() === colorLower) ||
+        variants.find((v) => v.name && v.name.trim().toLowerCase() === cleanColor) ||
+        variants.find(
+          (v) =>
+            v.name &&
+            (cleanColor.includes(v.name.trim().toLowerCase()) ||
+              v.name.trim().toLowerCase().includes(cleanColor))
+        )
+      if (matched?.image?.trim()) {
+        return matched.image.trim()
+      }
+    } catch {
+      // ignore variant resolution errors
+    }
+  }
+
+  return product.image?.trim() || product.secondaryImage?.trim() || ''
 }

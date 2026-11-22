@@ -242,6 +242,15 @@ export const DEFAULT_FACEBOOK_URL = 'https://www.facebook.com/GBBFashion'
 export const DEFAULT_INSTAGRAM_URL = ''
 export const DEFAULT_TIKTOK_URL = ''
 
+/** Footer developer credit text (customizable from admin settings) */
+export const DEFAULT_DEVELOPER_CREDIT = 'Ahanaf Adud & Rakibul Hassan'
+
+export function normalizeDeveloperCredit(value: unknown): string {
+  if (value === undefined || value === null) return DEFAULT_DEVELOPER_CREDIT
+  if (typeof value === 'string') return value.trim()
+  return DEFAULT_DEVELOPER_CREDIT
+}
+
 export function normalizeSocialUrl(value: unknown, fallback = ''): string {
   if (typeof value !== 'string') return fallback
   const trimmed = value.trim()

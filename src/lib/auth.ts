@@ -38,20 +38,24 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = user.role
+        token.name = user.name
+        token.email = user.email
       }
 
-      // Always refresh role from DB so admin sessions survive refresh / old tokens
+      // Always refresh user info from DB so role, name, email survive refresh / updates
       if (token.id) {
         try {
           const dbUser = await db.user.findUnique({
             where: { id: String(token.id) },
-            select: { role: true },
+            select: { role: true, name: true, email: true },
           })
-          if (dbUser?.role) {
-            token.role = dbUser.role
+          if (dbUser) {
+            if (dbUser.role) token.role = dbUser.role
+            if (dbUser.name) token.name = dbUser.name
+            if (dbUser.email) token.email = dbUser.email
           }
         } catch {
-          // keep existing token.role
+          // keep existing token values
         }
       }
 
@@ -61,6 +65,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = String(token.id || '')
         session.user.role = String(token.role || 'customer')
+        if (token.name) session.user.name = String(token.name)
+        if (token.email) session.user.email = String(token.email)
       }
       return session
     },

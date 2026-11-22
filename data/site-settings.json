@@ -6,13 +6,14 @@
   "heroMediaUrl": "/uploads/branding/main-hero-image-jpg.jpg",
   "currencyCode": "BDT",
   "whatsappNumber": "8801335107218",
-  "whatsappIconId": "classic",
+  "whatsappIconId": "gradient",
   "whatsappIconUrl": "",
   "freeDeliveryMin": 2000,
   "deliveryCharge": 100,
   "facebookUrl": "https://www.facebook.com/GBBFashion",
   "instagramUrl": "",
   "tiktokUrl": "",
+  "developerCredit": "RRP GROUP - IT DEPARTMENT",
   "announcements": [
     "FREE SHIPPING ON ORDERS OVER ৳2,500",
     "CASH ON DELIVERY AVAILABLE",
@@ -233,5 +234,5 @@
     "message": "GBB Fashion is undergoing scheduled maintenance to improve your shopping experience. Thank you for your patience.",
     "eta": ""
   },
-  "updatedAt": "2026-07-22T10:14:38.265Z"
+  "updatedAt": "2026-11-22T12:56:40.907Z"
 }

@@ -25,7 +25,7 @@ function TikTokIcon({ className }: { className?: string }) {
 export function Footer() {
   const { setView } = useStore()
   const { goToShop, goHome } = useShopNavigation()
-  const { facebookUrl, instagramUrl, tiktokUrl } = useStoreCommerce()
+  const { facebookUrl, instagramUrl, tiktokUrl, developerCredit } = useStoreCommerce()
   const [email, setEmail] = useState('')
   const [subscribed, setSubscribed] = useState(false)
 
@@ -264,10 +264,14 @@ export function Footer() {
               </span>
             </div>
           </div>
-          <p className="text-xs text-slate-500 text-center">
-            Developed by:{' '}
-            <span className="text-slate-400">Ahanaf Adud &amp; Rakibul Hassan</span>
-          </p>
+          {developerCredit ? (
+            <p className="text-xs text-slate-500 text-center">
+              Developed by:{' '}
+              <span className="text-slate-400">
+                {developerCredit.replace(/^developed by:?\s*/i, '')}
+              </span>
+            </p>
+          ) : null}
         </div>
       </div>
     </footer>

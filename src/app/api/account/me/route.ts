@@ -4,6 +4,9 @@ import bcrypt from 'bcryptjs'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 const profileSelect = {
   id: true,
   name: true,

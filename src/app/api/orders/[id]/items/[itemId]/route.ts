@@ -13,6 +13,9 @@ import {
   restoreStockForOrderItems,
 } from '@/lib/order-stock'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 type ItemPatchBody = {
   color?: unknown
   size?: unknown
@@ -156,5 +159,79 @@ export async function PATCH(
     }
     console.error('Order item PATCH error:', error)
     return NextResponse.json({ error: 'Failed to update order item' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string; itemId: string }> },
+) {
+  try {
+    const { id: orderId, itemId } = await params
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    })
+    if (!order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+    if (order.status !== 'pending' && order.status !== 'processing') {
+      return NextResponse.json(
+        { error: 'Only pending or processing orders can be modified' },
+        { status: 400 },
+      )
+    }
+
+    const itemIndex = order.items.findIndex((row) => row.id === itemId)
+    if (itemIndex < 0) {
+      return NextResponse.json({ error: 'Order item not found' }, { status: 404 })
+    }
+
+    const existingItem = order.items[itemIndex]
+    const stockLine = toOrderStockLine({
+      productId: existingItem.productId,
+      productName: existingItem.productName,
+      quantity: existingItem.quantity,
+    })
+
+    // If this is the only item in the order, cancelling the item cancels the whole order
+    if (order.items.length === 1) {
+      const updated = await db.$transaction(async (tx) => {
+        if (stockLine) {
+          await restoreStockForOrderItems(tx, [stockLine])
+        }
+        await tx.orderItem.delete({ where: { id: itemId } })
+        return tx.order.update({
+          where: { id: orderId },
+          data: { status: 'cancelled', totalAmount: 0 },
+          include: { items: true },
+        })
+      })
+      return NextResponse.json(updated)
+    }
+
+    // Multiple items: restore stock for this item, delete it, and recalculate new order total
+    const remainingItems = order.items.filter((i) => i.id !== itemId)
+    const oldSubtotal = order.items.reduce((s, i) => s + i.price * i.quantity, 0)
+    const newSubtotal = remainingItems.reduce((s, i) => s + i.price * i.quantity, 0)
+    const shipping = Math.max(0, Math.round((order.totalAmount - oldSubtotal) * 100) / 100)
+    const nextTotal = Math.round((newSubtotal + shipping) * 100) / 100
+
+    const updated = await db.$transaction(async (tx) => {
+      if (stockLine) {
+        await restoreStockForOrderItems(tx, [stockLine])
+      }
+      await tx.orderItem.delete({ where: { id: itemId } })
+      return tx.order.update({
+        where: { id: orderId },
+        data: { totalAmount: nextTotal },
+        include: { items: true },
+      })
+    })
+
+    return NextResponse.json(updated)
+  } catch (error) {
+    console.error('Order item DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete order item' }, { status: 500 })
   }
 }

@@ -7,9 +7,11 @@ import {
   DEFAULT_FREE_DELIVERY_MIN,
   DEFAULT_INSTAGRAM_URL,
   DEFAULT_TIKTOK_URL,
+  DEFAULT_DEVELOPER_CREDIT,
   DEFAULT_WHATSAPP_ICON_ID,
   DEFAULT_WHATSAPP_ICON_URL,
   DEFAULT_WHATSAPP_NUMBER,
+  normalizeDeveloperCredit,
   normalizeMoneyAmount,
   normalizeSocialUrl,
   normalizeWhatsAppIconId,
@@ -29,6 +31,7 @@ export type StoreCommerceSettings = {
   facebookUrl: string
   instagramUrl: string
   tiktokUrl: string
+  developerCredit: string
 }
 
 export function broadcastStoreSettings(detail: Partial<StoreCommerceSettings>) {
@@ -46,6 +49,7 @@ const defaults: StoreCommerceSettings = {
   facebookUrl: DEFAULT_FACEBOOK_URL,
   instagramUrl: DEFAULT_INSTAGRAM_URL,
   tiktokUrl: DEFAULT_TIKTOK_URL,
+  developerCredit: DEFAULT_DEVELOPER_CREDIT,
 }
 
 export function useStoreCommerce() {
@@ -76,6 +80,7 @@ export function useStoreCommerce() {
           ),
           instagramUrl: normalizeSocialUrl(data.instagramUrl, DEFAULT_INSTAGRAM_URL),
           tiktokUrl: normalizeSocialUrl(data.tiktokUrl, DEFAULT_TIKTOK_URL),
+          developerCredit: normalizeDeveloperCredit(data.developerCredit),
         })
       })
       .catch(() => undefined)
@@ -116,6 +121,10 @@ export function useStoreCommerce() {
           detail.tiktokUrl !== undefined
             ? normalizeSocialUrl(detail.tiktokUrl, '')
             : prev.tiktokUrl,
+        developerCredit:
+          detail.developerCredit !== undefined
+            ? normalizeDeveloperCredit(detail.developerCredit)
+            : prev.developerCredit,
       }))
     }
 
